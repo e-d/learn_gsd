@@ -65,6 +65,8 @@ body {
   margin: 0;
   padding: 1rem 1.25rem;
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: calc(20 * 1.6em);
   font-size: 0.875rem;
   line-height: 1.6;
 }
