@@ -24,25 +24,31 @@ const base = import.meta.env.BASE_URL;
 	<section class="mb-16">
 		<h2 class="text-2xl font-semibold text-heading mb-4">Installation & Setup</h2>
 		<p class="text-text mb-4">
-			Claude Code is installed globally via npm. You'll need Node.js 18 or later.
+			Claude Code is installed with a one-line command. Run the appropriate command for your platform:
 		</p>
 
-		<CodeGroup
-			title="Install Claude Code"
-			python={`# Install Claude Code globally
-npm install -g @anthropic-ai/claude-code
+		<h3 class="text-lg font-semibold text-heading mb-3">macOS / Linux</h3>
+		<pre class="bg-surface-alt rounded-lg p-4 mb-4 overflow-x-auto"><code class="text-sm text-text">curl -fsSL https://claude.ai/install.sh | bash</code></pre>
 
-# Verify the installation
-claude --version`}
-			typescript={`# Install Claude Code globally
-npm install -g @anthropic-ai/claude-code
+		<h3 class="text-lg font-semibold text-heading mb-3">Windows (PowerShell)</h3>
+		<pre class="bg-surface-alt rounded-lg p-4 mb-4 overflow-x-auto"><code class="text-sm text-text">irm https://claude.ai/install.ps1 | iex</code></pre>
 
-# Verify the installation
-claude --version`}
-		/>
+		<h3 class="text-lg font-semibold text-heading mb-3">Windows (CMD)</h3>
+		<pre class="bg-surface-alt rounded-lg p-4 mb-4 overflow-x-auto"><code class="text-sm text-text">curl -fsSL https://claude.ai/install.cmd -o install.cmd && install.cmd && del install.cmd</code></pre>
 
 		<p class="text-text mb-4">
-			On first launch, Claude Code will ask you to authenticate with your Anthropic account. Follow the browser prompt to connect your API key.
+			Verify the installation:
+		</p>
+		<pre class="bg-surface-alt rounded-lg p-4 mb-4 overflow-x-auto"><code class="text-sm text-text">claude --version</code></pre>
+
+		<div class="bg-surface-alt border border-border rounded-lg p-4 mb-4">
+			<p class="text-text text-sm">
+				<strong class="text-accent">Windows note:</strong> Native Windows installs require <a href="https://git-scm.com/downloads/win" class="text-accent hover:underline">Git for Windows</a>. Alternatively, you can install Claude Code inside <strong>WSL</strong> (Windows Subsystem for Linux) using the macOS/Linux command above — WSL does not require Git for Windows. If you're unsure which to pick: use WSL if you prefer Linux toolchains, or native Windows if your projects use Windows-native tools.
+			</p>
+		</div>
+
+		<p class="text-text mb-4">
+			On first launch, Claude Code will ask you to authenticate with your Anthropic account. Follow the browser prompt to connect your API key. You'll need a Pro, Max, Team, or Enterprise plan — the free Claude.ai plan does not include Claude Code access.
 		</p>
 		<p class="text-text mb-6">
 			Now create a project directory. Claude Code works best when launched from the root of a project — it uses the directory structure and any existing files to understand context.
