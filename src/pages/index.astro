@@ -1,0 +1,36 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Hero from '../components/Hero.astro';
+import TutorialCard from '../components/TutorialCard.astro';
+---
+
+<BaseLayout title="Learn GSD — Hands-on Claude Code & GSD Tutorials">
+	<div class="mx-auto max-w-[1100px] px-6">
+		<Hero />
+		<section id="tutorials" class="pb-20">
+			<div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+				<TutorialCard
+					number={1}
+					title="Claude Code Fundamentals"
+					description="Learn the basics of Claude Code: setup, commands, and your first AI-assisted coding session."
+					href={`${import.meta.env.BASE_URL}tutorials/claude-code-fundamentals`}
+					readingTime="30 min"
+				/>
+				<TutorialCard
+					number={2}
+					title="Building Features with GSD"
+					description="Walk through the GSD plan-execute-verify loop to build a real feature from scratch."
+					href={`${import.meta.env.BASE_URL}tutorials/building-features-with-gsd`}
+					readingTime="45 min"
+				/>
+				<TutorialCard
+					number={3}
+					title="Refactoring with GSD"
+					description="Use GSD's structured workflow to safely refactor existing code with confidence."
+					href={`${import.meta.env.BASE_URL}tutorials/refactoring-with-gsd`}
+					readingTime="45 min"
+				/>
+			</div>
+		</section>
+	</div>
+</BaseLayout>

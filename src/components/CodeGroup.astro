@@ -1,0 +1,36 @@
+---
+import { createHighlighter } from 'shiki';
+import CodeBlock from './CodeBlock.tsx';
+
+interface Props {
+  python?: string;
+  typescript?: string;
+  title?: string;
+}
+
+const { python, typescript, title } = Astro.props;
+
+const highlighter = await createHighlighter({
+  themes: ['github-dark-default'],
+  langs: ['python', 'typescript'],
+});
+
+const variants: Record<string, string> = {};
+
+if (python) {
+  variants.python = highlighter.codeToHtml(python.trim(), {
+    lang: 'python',
+    theme: 'github-dark-default',
+  });
+}
+
+if (typescript) {
+  variants.typescript = highlighter.codeToHtml(typescript.trim(), {
+    lang: 'typescript',
+    theme: 'github-dark-default',
+  });
+}
+---
+
+{title && <p class="code-group-title">{title}</p>}
+<CodeBlock client:load variants={variants} />

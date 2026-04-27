@@ -1,3 +1,5 @@
+# ── Build artifacts ──
+.astro/
 
 # ── GSD baseline (auto-generated) ──
 .gsd

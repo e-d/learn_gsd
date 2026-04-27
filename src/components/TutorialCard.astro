@@ -1,0 +1,30 @@
+---
+interface Props {
+	title: string;
+	description: string;
+	href: string;
+	readingTime: string;
+	number: number;
+}
+
+const { title, description, href, readingTime, number } = Astro.props;
+---
+
+<a href={href} class="group block rounded-lg border border-border bg-surface p-6 transition-all hover:border-accent/50 hover:shadow-[0_0_20px_rgba(99,102,241,0.08)]">
+	<div class="flex items-center gap-3 mb-3">
+		<span class="text-accent text-sm font-medium">{String(number).padStart(2, '0')}</span>
+		<span class="text-text-muted text-xs">{readingTime}</span>
+	</div>
+	<h3 class="text-heading text-lg font-semibold group-hover:text-accent transition-colors">
+		{title}
+	</h3>
+	<p class="text-text-muted text-sm mt-2 leading-relaxed">
+		{description}
+	</p>
+	<span class="inline-flex items-center gap-1 text-accent text-sm mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+		Start tutorial
+		<svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="translate-x-0 group-hover:translate-x-1 transition-transform">
+			<path d="M6 12L10 8L6 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+		</svg>
+	</span>
+</a>

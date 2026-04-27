@@ -1,0 +1,799 @@
+---
+import TutorialLayout from '../../layouts/TutorialLayout.astro';
+import CodeGroup from '../../components/CodeGroup.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<TutorialLayout title="Building Features with GSD" description="Walk through the GSD plan-execute-verify loop to build a real feature from scratch.">
+
+	<!-- Section 1: Why You Need a Workflow -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Why You Need a Workflow</h2>
+		<p class="text-text mb-4">
+			In <a href={`${base}tutorials/claude-code-fundamentals`} class="text-accent hover:text-accent-hover transition-colors underline">Tutorial 1</a>, you built a task tracker CLI by typing prompts into Claude Code. That works great for small, self-contained features — add a command, tweak the output, done.
+		</p>
+		<p class="text-text mb-4">
+			But what happens when the feature is bigger? Say you want to add priorities, due dates, and filtered views to the task tracker. That's three interconnected changes to the data model, three new CLI commands, modifications to existing commands, and new display logic. If you just start prompting, you'll end up backtracking — "wait, I need to change the add command too" — or building something that doesn't quite fit together.
+		</p>
+		<p class="text-text mb-4">
+			This is where <strong class="text-heading">GSD</strong> comes in. GSD (Get Shit Done) is a structured workflow that sits on top of Claude Code. It breaks work into a loop:
+		</p>
+		<ol class="text-text mb-6 list-decimal list-inside space-y-2 pl-2">
+			<li><strong class="text-heading">Plan</strong> — define what you're building, break it into slices, break slices into tasks</li>
+			<li><strong class="text-heading">Execute</strong> — work through each task with Claude Code, one at a time</li>
+			<li><strong class="text-heading">Verify</strong> — prove the work is done before moving on</li>
+		</ol>
+		<p class="text-text mb-6">
+			It sounds like overhead. It's actually the opposite — the upfront planning prevents the rework that eats real time. In this tutorial, you'll use GSD to add priorities and due dates to the task tracker from Tutorial 1, and you'll see how the structure keeps the work clean even when the feature touches multiple parts of the code.
+		</p>
+	</section>
+
+	<!-- Section 2: Setting Up GSD -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Setting Up GSD</h2>
+		<p class="text-text mb-4">
+			GSD is available as a plugin for Claude Code. If you haven't installed it yet, add it globally:
+		</p>
+
+		<CodeGroup
+			title="Install GSD"
+			python={`# Install the GSD plugin
+npm install -g gsd-pi
+
+# Navigate to your task tracker project from Tutorial 1
+cd task-tracker
+
+# Start Claude Code with GSD
+claude`}
+			typescript={`# Install the GSD plugin
+npm install -g gsd-pi
+
+# Navigate to your task tracker project from Tutorial 1
+cd task-tracker
+
+# Start Claude Code with GSD
+claude`}
+		/>
+
+		<p class="text-text mb-4">
+			Once Claude Code launches, type <code class="text-accent">/gsd</code> to activate the GSD wizard. It will walk you through initializing GSD for your project — creating a <code class="text-accent">.gsd/</code> directory to store plans, decisions, and progress tracking.
+		</p>
+		<p class="text-text mb-6">
+			GSD stores everything as plain files in your project. No databases, no cloud services, no accounts. The <code class="text-accent">.gsd/</code> directory contains your project state, milestone plans, and execution history — all version-controllable and human-readable.
+		</p>
+
+		<div class="rounded-lg border border-border bg-surface p-6 mb-6">
+			<p class="text-text-muted text-sm mb-3">After initialization, your project looks like this:</p>
+			<pre class="text-text font-mono text-sm leading-relaxed"><code>task-tracker/
+├── task_tracker.py  (or .ts)
+├── tasks.json
+└── .gsd/
+    ├── PROJECT.md       ← what the project is
+    ├── REQUIREMENTS.md  ← what it needs to do
+    ├── DECISIONS.md     ← choices made and why
+    ├── STATE.md         ← current progress
+    └── milestones/      ← planned work</code></pre>
+		</div>
+
+		<p class="text-text mb-6">
+			The key insight: GSD treats planning artifacts as first-class project state. When you plan a feature, the plan lives next to the code. When you make a decision, the rationale is captured. When you finish a task, the verification evidence is recorded. A future developer (or future you) can reconstruct exactly what happened and why.
+		</p>
+	</section>
+
+	<!-- Section 3: Planning the Feature -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Planning the Feature</h2>
+		<p class="text-text mb-4">
+			Let's plan the feature we're adding: <strong class="text-heading">priorities and due dates</strong> for the task tracker. Start by telling GSD what you want to build:
+		</p>
+
+		<div class="rounded-lg border border-border bg-surface p-6 mb-6">
+			<p class="text-text-muted text-sm mb-2">Your prompt:</p>
+			<p class="text-text font-mono text-sm">
+				I want to add priorities (high, medium, low) and due dates to the task tracker. Users should be able to set priority and due date when adding a task, see them in the list output, and filter tasks by priority or show only overdue tasks.
+			</p>
+		</div>
+
+		<p class="text-text mb-4">
+			GSD breaks this into a <strong class="text-heading">milestone</strong> (the overall feature) containing <strong class="text-heading">slices</strong> (independently demoable vertical increments). Each slice produces something you can test. Here's roughly how GSD would decompose this:
+		</p>
+
+		<div class="rounded-lg border border-border bg-surface p-6 mb-6">
+			<p class="text-text-muted text-sm mb-3">GSD's roadmap for this feature:</p>
+			<div class="space-y-3">
+				<div class="flex items-start gap-3">
+					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">S01</span>
+					<div>
+						<p class="text-heading text-sm font-medium">Add priority field to data model + add command</p>
+						<p class="text-text-muted text-sm">After this: tasks have a priority, <code class="text-accent text-xs">add</code> accepts <code class="text-accent text-xs">--priority</code>, <code class="text-accent text-xs">list</code> shows it</p>
+					</div>
+				</div>
+				<div class="flex items-start gap-3">
+					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">S02</span>
+					<div>
+						<p class="text-heading text-sm font-medium">Add due date field + overdue detection</p>
+						<p class="text-text-muted text-sm">After this: tasks have optional due dates, <code class="text-accent text-xs">list</code> highlights overdue tasks</p>
+					</div>
+				</div>
+				<div class="flex items-start gap-3">
+					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">S03</span>
+					<div>
+						<p class="text-heading text-sm font-medium">Add filter commands</p>
+						<p class="text-text-muted text-sm">After this: users can filter by priority and list overdue tasks</p>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<p class="text-text mb-4">
+			Notice the ordering. GSD puts slices in <strong class="text-heading">risk order</strong> — the riskiest or most foundational work first. S01 modifies the data model, which everything else depends on. If that design is wrong, we want to find out before building filtering on top of it.
+		</p>
+		<p class="text-text mb-6">
+			Each slice gets further broken into <strong class="text-heading">tasks</strong> — units of work small enough to complete in a single Claude Code session. GSD tracks these at <code class="text-accent">.gsd/milestones/M001/slices/S01/S01-PLAN.md</code>. You don't need to create these files manually — GSD does it from the planning conversation.
+		</p>
+	</section>
+
+	<!-- Section 4: Executing: Slice by Slice -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Executing: Slice by Slice</h2>
+		<p class="text-text mb-4">
+			With the plan in place, GSD switches to execution mode. You can run <code class="text-accent">/gsd auto</code> to let GSD work through the tasks automatically, or step through them manually. Either way, the loop is the same: pick up the next task, execute it, verify it, record the result.
+		</p>
+		<p class="text-text mb-4">
+			Let's walk through <strong class="text-heading">Slice 1</strong> manually to see the mechanics.
+		</p>
+
+		<h3 class="text-lg font-semibold text-heading mb-3 mt-8">Task 1: Update the data model</h3>
+		<p class="text-text mb-4">
+			The first task modifies the task data structure to include a priority field. GSD tells Claude Code exactly what to do — the task plan specifies the files to touch, the expected output, and the verification criteria.
+		</p>
+
+		<CodeGroup
+			title="Updated data model with priority"
+			python={`#!/usr/bin/env python3
+"""Task tracker CLI with priorities and timestamps."""
+
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Literal
+
+import click
+
+TASKS_FILE = Path("tasks.json")
+
+Priority = Literal["high", "medium", "low"]
+VALID_PRIORITIES = ("high", "medium", "low")
+
+
+def load_tasks() -> list[dict]:
+    if TASKS_FILE.exists():
+        return json.loads(TASKS_FILE.read_text())
+    return []
+
+
+def save_tasks(tasks: list[dict]) -> None:
+    TASKS_FILE.write_text(json.dumps(tasks, indent=2))
+
+
+def time_ago(iso_str: str) -> str:
+    dt = datetime.fromisoformat(iso_str)
+    delta = datetime.now(timezone.utc) - dt
+    if delta.days > 0:
+        return f"{delta.days}d ago"
+    hours = delta.seconds // 3600
+    if hours > 0:
+        return f"{hours}h ago"
+    minutes = delta.seconds // 60
+    return f"{minutes}m ago"
+
+
+def priority_marker(priority: str) -> str:
+    markers = {"high": "!!!", "medium": "!!", "low": "!"}
+    return markers.get(priority, "")
+
+
+@click.group()
+def cli():
+    """A simple task tracker with priorities."""
+    pass
+
+
+@cli.command()
+@click.argument("title")
+@click.option(
+    "--priority", "-p",
+    type=click.Choice(VALID_PRIORITIES),
+    default="medium",
+    help="Task priority (high, medium, low)",
+)
+def add(title: str, priority: str):
+    """Add a new task."""
+    tasks = load_tasks()
+    task = {
+        "id": len(tasks) + 1,
+        "title": title,
+        "done": False,
+        "priority": priority,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "completed_at": None,
+    }
+    tasks.append(task)
+    save_tasks(tasks)
+    click.echo(f"Added task {task['id']}: {title} [{priority}]")
+
+
+@cli.command(name="list")
+def list_tasks():
+    """List all tasks."""
+    tasks = load_tasks()
+    if not tasks:
+        click.echo("No tasks yet. Add one with: task-tracker add 'My task'")
+        return
+    for task in tasks:
+        status = "x" if task["done"] else " "
+        age = time_ago(task["created_at"])
+        marker = priority_marker(task.get("priority", "medium"))
+        click.echo(f"[{status}] {task['id']}: {task['title']}  {marker}  ({age})")
+
+
+@cli.command()
+@click.argument("task_id", type=int)
+def done(task_id: int):
+    """Mark a task as complete."""
+    tasks = load_tasks()
+    for task in tasks:
+        if task["id"] == task_id:
+            task["done"] = True
+            task["completed_at"] = datetime.now(timezone.utc).isoformat()
+            save_tasks(tasks)
+            click.echo(f"Completed: {task['title']}")
+            return
+    click.echo(f"Task {task_id} not found.", err=True)
+    sys.exit(1)
+
+
+if __name__ == "__main__":
+    cli()`}
+			typescript={`#!/usr/bin/env node
+// Task tracker CLI with priorities and timestamps.
+
+import { Command } from "commander";
+import { readFileSync, writeFileSync, existsSync } from "fs";
+
+const TASKS_FILE = "tasks.json";
+
+type Priority = "high" | "medium" | "low";
+
+interface Task {
+  id: number;
+  title: string;
+  done: boolean;
+  priority: Priority;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+function loadTasks(): Task[] {
+  if (existsSync(TASKS_FILE)) {
+    return JSON.parse(readFileSync(TASKS_FILE, "utf-8"));
+  }
+  return [];
+}
+
+function saveTasks(tasks: Task[]): void {
+  writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2));
+}
+
+function timeAgo(isoStr: string): string {
+  const delta = Date.now() - new Date(isoStr).getTime();
+  const days = Math.floor(delta / 86_400_000);
+  if (days > 0) return \`\${days}d ago\`;
+  const hours = Math.floor(delta / 3_600_000);
+  if (hours > 0) return \`\${hours}h ago\`;
+  const minutes = Math.floor(delta / 60_000);
+  return \`\${minutes}m ago\`;
+}
+
+function priorityMarker(priority: Priority): string {
+  const markers = { high: "!!!", medium: "!!", low: "!" };
+  return markers[priority] ?? "";
+}
+
+const program = new Command();
+program.name("task-tracker").description("A simple task tracker with priorities.");
+
+program
+  .command("add <title>")
+  .description("Add a new task")
+  .option("-p, --priority <level>", "Task priority (high, medium, low)", "medium")
+  .action((title: string, opts: { priority: string }) => {
+    const priority = opts.priority as Priority;
+    const tasks = loadTasks();
+    const task: Task = {
+      id: tasks.length + 1,
+      title,
+      done: false,
+      priority,
+      createdAt: new Date().toISOString(),
+      completedAt: null,
+    };
+    tasks.push(task);
+    saveTasks(tasks);
+    console.log(\`Added task \${task.id}: \${title} [\${priority}]\`);
+  });
+
+program
+  .command("list")
+  .description("List all tasks")
+  .action(() => {
+    const tasks = loadTasks();
+    if (tasks.length === 0) {
+      console.log("No tasks yet. Add one with: task-tracker add 'My task'");
+      return;
+    }
+    for (const task of tasks) {
+      const status = task.done ? "x" : " ";
+      const age = timeAgo(task.createdAt);
+      const marker = priorityMarker(task.priority);
+      console.log(\`[\${status}] \${task.id}: \${task.title}  \${marker}  (\${age})\`);
+    }
+  });
+
+program
+  .command("done <taskId>")
+  .description("Mark a task as complete")
+  .action((taskId: string) => {
+    const tasks = loadTasks();
+    const task = tasks.find((t) => t.id === parseInt(taskId));
+    if (!task) {
+      console.error(\`Task \${taskId} not found.\`);
+      process.exit(1);
+    }
+    task.done = true;
+    task.completedAt = new Date().toISOString();
+    saveTasks(tasks);
+    console.log(\`Completed: \${task.title}\`);
+  });
+
+program.parse();`}
+		/>
+
+		<p class="text-text mb-4">
+			After Claude Code makes the changes, GSD verifies the task. It doesn't just check that the code compiles — it runs the actual commands and checks the output matches expectations:
+		</p>
+
+		<CodeGroup
+			title="Verification — testing the priority feature"
+			python={`# Add tasks with different priorities
+python task_tracker.py add "Fix login bug" --priority high
+python task_tracker.py add "Update docs" --priority low
+python task_tracker.py add "Review PR"
+
+# List shows priorities
+python task_tracker.py list
+# [ ] 1: Learn Claude Code basics    !!   (2d ago)
+# [ ] 2: Build something real        !!   (2d ago)
+# [ ] 3: Fix login bug               !!!  (just now)
+# [ ] 4: Update docs                 !    (just now)
+# [ ] 5: Review PR                   !!   (just now)`}
+			typescript={`# Add tasks with different priorities
+npx tsx task_tracker.ts add "Fix login bug" --priority high
+npx tsx task_tracker.ts add "Update docs" --priority low
+npx tsx task_tracker.ts add "Review PR"
+
+# List shows priorities
+npx tsx task_tracker.ts list
+# [ ] 1: Learn Claude Code basics    !!   (2d ago)
+# [ ] 2: Build something real        !!   (2d ago)
+# [ ] 3: Fix login bug               !!!  (just now)
+# [ ] 4: Update docs                 !    (just now)
+# [ ] 5: Review PR                   !!   (just now)`}
+		/>
+
+		<p class="text-text mb-4">
+			The task passes verification. GSD records the evidence and moves to the next task. This is the core loop: <strong class="text-heading">plan → execute → verify → advance</strong>.
+		</p>
+
+		<h3 class="text-lg font-semibold text-heading mb-3 mt-8">The reassessment step</h3>
+		<p class="text-text mb-6">
+			Here's something that distinguishes GSD from a simple task list. After each slice completes, GSD <strong class="text-heading">reassesses the roadmap</strong>. It asks: did we learn anything that changes the remaining plan? Maybe adding priorities was simpler than expected, so the filtering slice can be more ambitious. Or maybe we discovered that the JSON storage format needs restructuring, and that affects the next slice. The plan is a living document — not a contract you wrote before you understood the problem.
+		</p>
+	</section>
+
+	<!-- Section 5: Adding Due Dates -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Adding Due Dates and Filters</h2>
+		<p class="text-text mb-4">
+			Slice 2 adds due dates. This follows the same loop, but now we're building on the foundation from Slice 1. GSD tracks the dependency — it knows due dates build on the priority-enhanced data model and won't start Slice 2 until Slice 1's verification passes.
+		</p>
+
+		<CodeGroup
+			title="Due dates and filtering"
+			python={`from datetime import datetime, timezone, timedelta
+from pathlib import Path
+import json, sys, click
+
+TASKS_FILE = Path("tasks.json")
+VALID_PRIORITIES = ("high", "medium", "low")
+
+
+def load_tasks() -> list[dict]:
+    if TASKS_FILE.exists():
+        return json.loads(TASKS_FILE.read_text())
+    return []
+
+
+def save_tasks(tasks: list[dict]) -> None:
+    TASKS_FILE.write_text(json.dumps(tasks, indent=2))
+
+
+def time_ago(iso_str: str) -> str:
+    dt = datetime.fromisoformat(iso_str)
+    delta = datetime.now(timezone.utc) - dt
+    if delta.days > 0:
+        return f"{delta.days}d ago"
+    hours = delta.seconds // 3600
+    if hours > 0:
+        return f"{hours}h ago"
+    return f"{delta.seconds // 60}m ago"
+
+
+def priority_marker(priority: str) -> str:
+    return {"high": "!!!", "medium": "!!", "low": "!"}.get(priority, "")
+
+
+def is_overdue(task: dict) -> bool:
+    due = task.get("due_date")
+    if not due or task["done"]:
+        return False
+    return datetime.fromisoformat(due) < datetime.now(timezone.utc)
+
+
+def format_due(task: dict) -> str:
+    due = task.get("due_date")
+    if not due:
+        return ""
+    dt = datetime.fromisoformat(due)
+    label = dt.strftime("%b %d")
+    if is_overdue(task):
+        return f"OVERDUE {label}"
+    delta = dt - datetime.now(timezone.utc)
+    if delta.days <= 1:
+        return f"due tomorrow"
+    return f"due {label}"
+
+
+@click.group()
+def cli():
+    """Task tracker with priorities and due dates."""
+    pass
+
+
+@cli.command()
+@click.argument("title")
+@click.option("-p", "--priority", type=click.Choice(VALID_PRIORITIES), default="medium")
+@click.option("-d", "--due", "due_date", default=None, help="Due date (YYYY-MM-DD)")
+def add(title: str, priority: str, due_date: str | None):
+    """Add a new task."""
+    tasks = load_tasks()
+    due_iso = None
+    if due_date:
+        due_iso = datetime.strptime(due_date, "%Y-%m-%d").replace(
+            tzinfo=timezone.utc
+        ).isoformat()
+    task = {
+        "id": len(tasks) + 1,
+        "title": title,
+        "done": False,
+        "priority": priority,
+        "due_date": due_iso,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "completed_at": None,
+    }
+    tasks.append(task)
+    save_tasks(tasks)
+    click.echo(f"Added task {task['id']}: {title} [{priority}]")
+
+
+@cli.command(name="list")
+@click.option("-p", "--priority", type=click.Choice(VALID_PRIORITIES), default=None)
+@click.option("--overdue", is_flag=True, help="Show only overdue tasks")
+def list_tasks(priority: str | None, overdue: bool):
+    """List tasks, optionally filtered."""
+    tasks = load_tasks()
+    if priority:
+        tasks = [t for t in tasks if t.get("priority") == priority]
+    if overdue:
+        tasks = [t for t in tasks if is_overdue(t)]
+    if not tasks:
+        click.echo("No matching tasks.")
+        return
+    for task in tasks:
+        status = "x" if task["done"] else " "
+        age = time_ago(task["created_at"])
+        marker = priority_marker(task.get("priority", "medium"))
+        due = format_due(task)
+        due_str = f"  {due}" if due else ""
+        click.echo(f"[{status}] {task['id']}: {task['title']}  {marker}{due_str}  ({age})")
+
+
+@cli.command()
+@click.argument("task_id", type=int)
+def done(task_id: int):
+    """Mark a task as complete."""
+    tasks = load_tasks()
+    for task in tasks:
+        if task["id"] == task_id:
+            task["done"] = True
+            task["completed_at"] = datetime.now(timezone.utc).isoformat()
+            save_tasks(tasks)
+            click.echo(f"Completed: {task['title']}")
+            return
+    click.echo(f"Task {task_id} not found.", err=True)
+    sys.exit(1)
+
+
+if __name__ == "__main__":
+    cli()`}
+			typescript={`#!/usr/bin/env node
+// Task tracker CLI with priorities, due dates, and filtering.
+
+import { Command } from "commander";
+import { readFileSync, writeFileSync, existsSync } from "fs";
+
+const TASKS_FILE = "tasks.json";
+
+type Priority = "high" | "medium" | "low";
+
+interface Task {
+  id: number;
+  title: string;
+  done: boolean;
+  priority: Priority;
+  dueDate: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+function loadTasks(): Task[] {
+  if (existsSync(TASKS_FILE)) {
+    return JSON.parse(readFileSync(TASKS_FILE, "utf-8"));
+  }
+  return [];
+}
+
+function saveTasks(tasks: Task[]): void {
+  writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2));
+}
+
+function timeAgo(isoStr: string): string {
+  const delta = Date.now() - new Date(isoStr).getTime();
+  const days = Math.floor(delta / 86_400_000);
+  if (days > 0) return \`\${days}d ago\`;
+  const hours = Math.floor(delta / 3_600_000);
+  if (hours > 0) return \`\${hours}h ago\`;
+  return \`\${Math.floor(delta / 60_000)}m ago\`;
+}
+
+function priorityMarker(p: Priority): string {
+  return { high: "!!!", medium: "!!", low: "!" }[p] ?? "";
+}
+
+function isOverdue(task: Task): boolean {
+  if (!task.dueDate || task.done) return false;
+  return new Date(task.dueDate).getTime() < Date.now();
+}
+
+function formatDue(task: Task): string {
+  if (!task.dueDate) return "";
+  const dt = new Date(task.dueDate);
+  const label = dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (isOverdue(task)) return \`OVERDUE \${label}\`;
+  const delta = dt.getTime() - Date.now();
+  if (delta < 86_400_000) return "due tomorrow";
+  return \`due \${label}\`;
+}
+
+const program = new Command();
+program.name("task-tracker").description("Task tracker with priorities and due dates.");
+
+program
+  .command("add <title>")
+  .description("Add a new task")
+  .option("-p, --priority <level>", "Priority (high, medium, low)", "medium")
+  .option("-d, --due <date>", "Due date (YYYY-MM-DD)")
+  .action((title: string, opts: { priority: string; due?: string }) => {
+    const priority = opts.priority as Priority;
+    const dueDate = opts.due
+      ? new Date(opts.due + "T00:00:00Z").toISOString()
+      : null;
+    const tasks = loadTasks();
+    const task: Task = {
+      id: tasks.length + 1,
+      title,
+      done: false,
+      priority,
+      dueDate,
+      createdAt: new Date().toISOString(),
+      completedAt: null,
+    };
+    tasks.push(task);
+    saveTasks(tasks);
+    console.log(\`Added task \${task.id}: \${title} [\${priority}]\`);
+  });
+
+program
+  .command("list")
+  .description("List tasks, optionally filtered")
+  .option("-p, --priority <level>", "Filter by priority")
+  .option("--overdue", "Show only overdue tasks")
+  .action((opts: { priority?: string; overdue?: boolean }) => {
+    let tasks = loadTasks();
+    if (opts.priority) {
+      tasks = tasks.filter((t) => t.priority === opts.priority);
+    }
+    if (opts.overdue) {
+      tasks = tasks.filter(isOverdue);
+    }
+    if (tasks.length === 0) {
+      console.log("No matching tasks.");
+      return;
+    }
+    for (const task of tasks) {
+      const status = task.done ? "x" : " ";
+      const age = timeAgo(task.createdAt);
+      const marker = priorityMarker(task.priority);
+      const due = formatDue(task);
+      const dueStr = due ? \`  \${due}\` : "";
+      console.log(\`[\${status}] \${task.id}: \${task.title}  \${marker}\${dueStr}  (\${age})\`);
+    }
+  });
+
+program
+  .command("done <taskId>")
+  .description("Mark a task as complete")
+  .action((taskId: string) => {
+    const tasks = loadTasks();
+    const task = tasks.find((t) => t.id === parseInt(taskId));
+    if (!task) {
+      console.error(\`Task \${taskId} not found.\`);
+      process.exit(1);
+    }
+    task.done = true;
+    task.completedAt = new Date().toISOString();
+    saveTasks(tasks);
+    console.log(\`Completed: \${task.title}\`);
+  });
+
+program.parse();`}
+		/>
+
+		<p class="text-text mb-4">
+			Now try the full feature set:
+		</p>
+
+		<CodeGroup
+			title="Testing priorities, due dates, and filters"
+			python={`# Add tasks with priorities and due dates
+python task_tracker.py add "Ship v2.0" --priority high --due 2026-05-01
+python task_tracker.py add "Write changelog" --priority low --due 2026-04-20
+python task_tracker.py add "Code review" --priority medium
+
+# List all tasks
+python task_tracker.py list
+# [ ] 1: Ship v2.0        !!!  due May 01  (just now)
+# [ ] 2: Write changelog   !   OVERDUE Apr 20  (just now)
+# [ ] 3: Code review       !!  (just now)
+
+# Filter by priority
+python task_tracker.py list --priority high
+# [ ] 1: Ship v2.0  !!!  due May 01  (just now)
+
+# Show only overdue tasks
+python task_tracker.py list --overdue
+# [ ] 2: Write changelog  !  OVERDUE Apr 20  (just now)`}
+			typescript={`# Add tasks with priorities and due dates
+npx tsx task_tracker.ts add "Ship v2.0" --priority high --due 2026-05-01
+npx tsx task_tracker.ts add "Write changelog" --priority low --due 2026-04-20
+npx tsx task_tracker.ts add "Code review" --priority medium
+
+# List all tasks
+npx tsx task_tracker.ts list
+# [ ] 1: Ship v2.0        !!!  due May 01  (just now)
+# [ ] 2: Write changelog   !   OVERDUE Apr 20  (just now)
+# [ ] 3: Code review       !!  (just now)
+
+# Filter by priority
+npx tsx task_tracker.ts list --priority high
+# [ ] 1: Ship v2.0  !!!  due May 01  (just now)
+
+# Show only overdue tasks
+npx tsx task_tracker.ts list --overdue
+# [ ] 2: Write changelog  !  OVERDUE Apr 20  (just now)`}
+		/>
+
+		<p class="text-text mb-6">
+			Each of these was a separate GSD task, verified independently. The data model change was verified before the filter logic was written on top of it. That's why the slicing matters — problems surface early, when they're cheap to fix.
+		</p>
+	</section>
+
+	<!-- Section 6: What GSD Gives You -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">What GSD Gives You</h2>
+		<p class="text-text mb-4">
+			You could have done all of this without GSD — just prompted Claude Code step by step. So what did the structure buy you?
+		</p>
+
+		<div class="space-y-4 mb-6">
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">No backtracking</p>
+				<p class="text-text-muted text-sm">Because we planned the data model changes before the filter logic, we didn't have to refactor the add command after discovering the filter needed a field that didn't exist. The plan caught the dependency before execution hit it.</p>
+			</div>
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">Verified at every step</p>
+				<p class="text-text-muted text-sm">Each task was tested before moving on. If the priority field had been stored wrong, we'd have caught it in Slice 1 — not after building three slices of filtering logic on a broken foundation.</p>
+			</div>
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">Decision trail</p>
+				<p class="text-text-muted text-sm">GSD recorded why we chose <code class="text-accent text-xs">!!!</code> markers instead of color codes, why due dates are optional, why we filter on the <code class="text-accent text-xs">list</code> command instead of adding separate commands. These live in <code class="text-accent text-xs">.gsd/DECISIONS.md</code> for anyone who works on this code next.</p>
+			</div>
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">Resumable</p>
+				<p class="text-text-muted text-sm">If you'd closed your laptop after Slice 1, GSD's state file would tell the next session exactly where you left off, what was verified, and what's next. No lost context, no "wait, what was I doing?"</p>
+			</div>
+		</div>
+
+		<p class="text-text mb-6">
+			For a small feature like this, the overhead is modest — maybe 5 minutes of planning. For a larger feature (authentication, API integration, database migrations), the planning time pays for itself many times over in avoided rework and missed edge cases.
+		</p>
+	</section>
+
+	<!-- Section 7: Key Takeaways & Next Steps -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Key Takeaways</h2>
+
+		<ul class="text-text space-y-3 mb-8 list-none pl-0">
+			<li class="flex items-start gap-3">
+				<span class="text-accent mt-1 shrink-0">&#9656;</span>
+				<span><strong class="text-heading">Plan before you prompt.</strong> Five minutes of upfront planning prevents thirty minutes of backtracking. GSD's milestone → slice → task hierarchy makes this lightweight, not ceremonial.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-accent mt-1 shrink-0">&#9656;</span>
+				<span><strong class="text-heading">Verify at every boundary.</strong> Don't build filtering on an untested data model. GSD enforces verification between tasks — problems are caught early, when they're cheap to fix.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-accent mt-1 shrink-0">&#9656;</span>
+				<span><strong class="text-heading">Slices are demoable increments.</strong> Each slice produces something testable. If you stop after Slice 1, you still have a working task tracker with priorities — just without filters.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-accent mt-1 shrink-0">&#9656;</span>
+				<span><strong class="text-heading">The plan adapts.</strong> GSD reassesses the roadmap after each slice. Plans are useful because they force you to think ahead — not because they predict the future perfectly.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-accent mt-1 shrink-0">&#9656;</span>
+				<span><strong class="text-heading">Decisions are recorded, not remembered.</strong> When future-you opens this codebase, <code class="text-accent">.gsd/DECISIONS.md</code> explains the why. No archeology required.</span>
+			</li>
+		</ul>
+
+		<h2 class="text-2xl font-semibold text-heading mb-4">Next Steps</h2>
+		<p class="text-text mb-4">
+			You've used GSD to plan and execute a multi-slice feature on the task tracker. The workflow — plan, execute, verify, reassess — scales from CLI tools to full-stack applications.
+		</p>
+		<p class="text-text mb-6">
+			But what about existing code? In <a href={`${base}tutorials/refactoring-with-gsd`} class="text-accent hover:text-accent-hover transition-colors underline">Tutorial 3: Refactoring with GSD</a>, you'll take this same task tracker and refactor it — extracting modules, improving the storage layer, and adding tests. You'll see how GSD handles changes that touch everything without breaking anything.
+		</p>
+
+		<div class="flex justify-center">
+			<a
+				href={`${base}tutorials/refactoring-with-gsd`}
+				class="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-heading font-medium hover:bg-accent-hover transition-colors"
+			>
+				Continue to Tutorial 3
+				<span>&rarr;</span>
+			</a>
+		</div>
+	</section>
+
+</TutorialLayout>

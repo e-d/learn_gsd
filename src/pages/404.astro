@@ -1,0 +1,24 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Page Not Found — Learn GSD">
+	<div class="mx-auto max-w-[720px] px-6 py-20 text-center">
+		<p class="text-accent text-6xl font-bold mb-4">404</p>
+		<h1 class="text-heading text-3xl font-bold tracking-tight mb-4">Page not found</h1>
+		<p class="text-text-muted text-lg mb-8 max-w-md mx-auto leading-relaxed">
+			The page you're looking for doesn't exist or has been moved.
+		</p>
+		<div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+			<a
+				href={import.meta.env.BASE_URL}
+				class="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+			>
+				<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+					<path d="M10 12L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+				</svg>
+				Back to tutorials
+			</a>
+		</div>
+	</div>
+</BaseLayout>

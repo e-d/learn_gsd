@@ -1,0 +1,1068 @@
+---
+import TutorialLayout from '../../layouts/TutorialLayout.astro';
+import CodeGroup from '../../components/CodeGroup.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<TutorialLayout title="Refactoring with GSD" description="Use GSD's structured workflow to safely refactor existing code — extract modules, swap storage, and add tests without breaking anything.">
+
+	<!-- Section 1: Why Refactoring Is Scary -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Why Refactoring Is Scary</h2>
+		<p class="text-text mb-4">
+			In <a href={`${base}tutorials/building-features-with-gsd`} class="text-accent hover:text-accent-hover transition-colors underline">Tutorial 2</a>, you built priorities, due dates, and filtering into the task tracker. It works. But look at the code — everything lives in a single file. The data model, storage logic, CLI commands, and display formatting are all tangled together. Adding the next feature means wading through 100+ lines of mixed concerns.
+		</p>
+		<p class="text-text mb-4">
+			You know the code should be split into modules. You know the JSON file storage should be abstracted so you could swap it later. You know there should be tests. But refactoring working code is risky — especially when there are no tests to catch regressions.
+		</p>
+		<p class="text-text mb-6">
+			This is where most refactoring goes wrong. Someone starts moving functions around, breaks something subtle, spends an hour debugging, and either gives up or ships it with a "this should be fine" commit message. GSD prevents this by treating refactoring as structured work — planned, verified at every step, and reversible when something goes wrong.
+		</p>
+	</section>
+
+	<!-- Section 2: Planning the Refactor -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Planning the Refactor</h2>
+		<p class="text-text mb-4">
+			Start by telling GSD what you want to accomplish:
+		</p>
+
+		<div class="rounded-lg border border-border bg-surface p-6 mb-6">
+			<p class="text-text-muted text-sm mb-2">Your prompt:</p>
+			<p class="text-text font-mono text-sm">
+				I want to refactor the task tracker. Extract the storage logic into its own module, separate the CLI layer from the business logic, and add tests to make sure nothing broke. The behavior should be identical after refactoring.
+			</p>
+		</div>
+
+		<p class="text-text mb-4">
+			GSD decomposes this into slices, ordered by risk. Refactoring order matters — you don't extract the CLI layer before the storage layer, because the CLI depends on how data access works.
+		</p>
+
+		<div class="rounded-lg border border-border bg-surface p-6 mb-6">
+			<p class="text-text-muted text-sm mb-3">GSD's refactoring roadmap:</p>
+			<div class="space-y-3">
+				<div class="flex items-start gap-3">
+					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">S01</span>
+					<div>
+						<p class="text-heading text-sm font-medium">Add tests to the existing code</p>
+						<p class="text-text-muted text-sm">After this: test suite passes on the current single-file implementation — your safety net is in place</p>
+					</div>
+				</div>
+				<div class="flex items-start gap-3">
+					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">S02</span>
+					<div>
+						<p class="text-heading text-sm font-medium">Extract storage module</p>
+						<p class="text-text-muted text-sm">After this: storage is behind a clean interface, all existing tests still pass</p>
+					</div>
+				</div>
+				<div class="flex items-start gap-3">
+					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">S03</span>
+					<div>
+						<p class="text-heading text-sm font-medium">Separate business logic from CLI</p>
+						<p class="text-text-muted text-sm">After this: clean architecture — CLI is a thin shell, logic is independently testable, all tests pass</p>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<p class="text-text mb-4">
+			Notice S01 comes first: <strong class="text-heading">tests before refactoring.</strong> This is the single most important lesson in this tutorial. Without tests, you're flying blind — every change could break something you won't notice until a user reports it. With tests, every slice has an instant verification: <em>did the tests still pass?</em>
+		</p>
+		<p class="text-text mb-6">
+			GSD records this decision in <code class="text-accent">.gsd/DECISIONS.md</code>: "Write tests against the existing interface first, then refactor behind them. Tests verify behavior hasn't changed — they're the contract."
+		</p>
+	</section>
+
+	<!-- Section 3: Slice 1 — Tests First -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Slice 1: Tests First</h2>
+		<p class="text-text mb-4">
+			The first slice writes tests against the current code without changing any implementation. These tests capture the existing behavior — they're the contract that every subsequent refactoring step must honor.
+		</p>
+
+		<CodeGroup
+			title="Test suite for the task tracker"
+			python={`# test_task_tracker.py
+import json
+import os
+import pytest
+from click.testing import CliRunner
+from task_tracker import cli
+
+TASKS_FILE = "tasks.json"
+
+
+@pytest.fixture(autouse=True)
+def clean_tasks(tmp_path, monkeypatch):
+    """Run each test in a temp directory with no tasks file."""
+    monkeypatch.chdir(tmp_path)
+    yield
+    if os.path.exists(TASKS_FILE):
+        os.remove(TASKS_FILE)
+
+
+@pytest.fixture
+def runner():
+    return CliRunner()
+
+
+def read_tasks():
+    with open(TASKS_FILE) as f:
+        return json.load(f)
+
+
+class TestAdd:
+    def test_add_basic(self, runner):
+        result = runner.invoke(cli, ["add", "Buy milk"])
+        assert result.exit_code == 0
+        assert "Added task 1" in result.output
+        tasks = read_tasks()
+        assert len(tasks) == 1
+        assert tasks[0]["title"] == "Buy milk"
+        assert tasks[0]["priority"] == "medium"
+
+    def test_add_with_priority(self, runner):
+        result = runner.invoke(cli, ["add", "Fix bug", "-p", "high"])
+        assert result.exit_code == 0
+        tasks = read_tasks()
+        assert tasks[0]["priority"] == "high"
+
+    def test_add_with_due_date(self, runner):
+        result = runner.invoke(cli, ["add", "Ship it", "-d", "2026-12-31"])
+        assert result.exit_code == 0
+        tasks = read_tasks()
+        assert tasks[0]["due_date"] is not None
+
+
+class TestList:
+    def test_list_empty(self, runner):
+        result = runner.invoke(cli, ["list"])
+        assert result.exit_code == 0
+        assert "No matching tasks" in result.output or "No tasks" in result.output
+
+    def test_list_shows_tasks(self, runner):
+        runner.invoke(cli, ["add", "Task one"])
+        runner.invoke(cli, ["add", "Task two"])
+        result = runner.invoke(cli, ["list"])
+        assert "Task one" in result.output
+        assert "Task two" in result.output
+
+    def test_list_filter_priority(self, runner):
+        runner.invoke(cli, ["add", "Low task", "-p", "low"])
+        runner.invoke(cli, ["add", "High task", "-p", "high"])
+        result = runner.invoke(cli, ["list", "-p", "high"])
+        assert "High task" in result.output
+        assert "Low task" not in result.output
+
+
+class TestDone:
+    def test_mark_done(self, runner):
+        runner.invoke(cli, ["add", "Finish this"])
+        result = runner.invoke(cli, ["done", "1"])
+        assert result.exit_code == 0
+        assert "Completed" in result.output
+        tasks = read_tasks()
+        assert tasks[0]["done"] is True
+        assert tasks[0]["completed_at"] is not None
+
+    def test_done_not_found(self, runner):
+        result = runner.invoke(cli, ["done", "999"])
+        assert result.exit_code != 0`}
+			typescript={`// task_tracker.test.ts
+import { execSync } from "child_process";
+import { readFileSync, existsSync, mkdtempSync, rmSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+
+const CLI = "npx tsx task_tracker.ts";
+let testDir: string;
+
+function run(args: string): string {
+  return execSync(CLI + " " + args, {
+    cwd: testDir,
+    encoding: "utf-8",
+    env: { ...process.env },
+  }).trim();
+}
+
+function readTasks(): any[] {
+  const file = join(testDir, "tasks.json");
+  if (!existsSync(file)) return [];
+  return JSON.parse(readFileSync(file, "utf-8"));
+}
+
+beforeEach(() => {
+  testDir = mkdtempSync(join(tmpdir(), "task-tracker-"));
+  execSync("cp task_tracker.ts " + testDir + "/");
+});
+
+afterEach(() => {
+  rmSync(testDir, { recursive: true, force: true });
+});
+
+describe("add", () => {
+  it("adds a task with default priority", () => {
+    const output = run('add "Buy milk"');
+    expect(output).toContain("Added task 1");
+    const tasks = readTasks();
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].title).toBe("Buy milk");
+    expect(tasks[0].priority).toBe("medium");
+  });
+
+  it("adds a task with custom priority", () => {
+    run('add "Fix bug" --priority high');
+    const tasks = readTasks();
+    expect(tasks[0].priority).toBe("high");
+  });
+
+  it("adds a task with due date", () => {
+    run('add "Ship it" --due 2026-12-31');
+    const tasks = readTasks();
+    expect(tasks[0].dueDate).toBeTruthy();
+  });
+});
+
+describe("list", () => {
+  it("shows empty message when no tasks", () => {
+    const output = run("list");
+    expect(output).toMatch(/no (matching )?tasks/i);
+  });
+
+  it("shows added tasks", () => {
+    run('add "Task one"');
+    run('add "Task two"');
+    const output = run("list");
+    expect(output).toContain("Task one");
+    expect(output).toContain("Task two");
+  });
+
+  it("filters by priority", () => {
+    run('add "Low task" --priority low');
+    run('add "High task" --priority high');
+    const output = run("list --priority high");
+    expect(output).toContain("High task");
+    expect(output).not.toContain("Low task");
+  });
+});
+
+describe("done", () => {
+  it("marks a task as complete", () => {
+    run('add "Finish this"');
+    const output = run("done 1");
+    expect(output).toContain("Completed");
+    const tasks = readTasks();
+    expect(tasks[0].done).toBe(true);
+    expect(tasks[0].completedAt).toBeTruthy();
+  });
+
+  it("exits with error for missing task", () => {
+    expect(() => run("done 999")).toThrow();
+  });
+});`}
+		/>
+
+		<p class="text-text mb-4">
+			GSD verifies this slice by running the test suite:
+		</p>
+
+		<CodeGroup
+			title="Verification — all tests pass"
+			python={`pytest test_task_tracker.py -v
+
+# test_task_tracker.py::TestAdd::test_add_basic PASSED
+# test_task_tracker.py::TestAdd::test_add_with_priority PASSED
+# test_task_tracker.py::TestAdd::test_add_with_due_date PASSED
+# test_task_tracker.py::TestList::test_list_empty PASSED
+# test_task_tracker.py::TestList::test_list_shows_tasks PASSED
+# test_task_tracker.py::TestList::test_list_filter_priority PASSED
+# test_task_tracker.py::TestDone::test_mark_done PASSED
+# test_task_tracker.py::TestDone::test_done_not_found PASSED
+
+# 8 passed in 0.34s`}
+			typescript={`npx vitest run
+
+# ✓ task_tracker.test.ts (7)
+#   ✓ add (3)
+#     ✓ adds a task with default priority
+#     ✓ adds a task with custom priority
+#     ✓ adds a task with due date
+#   ✓ list (3)
+#     ✓ shows empty message when no tasks
+#     ✓ shows added tasks
+#     ✓ filters by priority
+#   ✓ done (2)
+#     ✓ marks a task as complete
+#     ✓ exits with error for missing task
+
+# Test Files  1 passed (1)
+# Tests  8 passed (8)`}
+		/>
+
+		<p class="text-text mb-6">
+			Eight tests, all green. We haven't changed a single line of implementation code. These tests are the contract — every future slice must keep them passing. GSD records the baseline and moves on.
+		</p>
+	</section>
+
+	<!-- Section 4: Slice 2 — Extract Storage -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Slice 2: Extract the Storage Layer</h2>
+		<p class="text-text mb-4">
+			Now the refactoring begins. The goal: move all JSON file I/O into a dedicated storage module with a clean interface. The main file should never touch the filesystem directly.
+		</p>
+		<p class="text-text mb-4">
+			This is where GSD's slice structure matters. The task plan specifies: extract storage, update imports in the main file, <strong class="text-heading">run the existing tests</strong>. The tests don't care where data is stored — they test through the CLI interface. If the tests still pass, the refactoring preserved behavior.
+		</p>
+
+		<CodeGroup
+			title="Extracted storage module"
+			python={`# storage.py
+"""Task persistence — JSON file storage."""
+
+import json
+from pathlib import Path
+
+DEFAULT_FILE = Path("tasks.json")
+
+
+class TaskStore:
+    def __init__(self, path: Path = DEFAULT_FILE):
+        self.path = path
+
+    def load(self) -> list[dict]:
+        if self.path.exists():
+            return json.loads(self.path.read_text())
+        return []
+
+    def save(self, tasks: list[dict]) -> None:
+        self.path.write_text(json.dumps(tasks, indent=2))
+
+    def next_id(self, tasks: list[dict]) -> int:
+        return max((t["id"] for t in tasks), default=0) + 1`}
+			typescript={`// storage.ts
+// Task persistence — JSON file storage.
+
+import { readFileSync, writeFileSync, existsSync } from "fs";
+
+const DEFAULT_FILE = "tasks.json";
+
+export interface Task {
+  id: number;
+  title: string;
+  done: boolean;
+  priority: "high" | "medium" | "low";
+  dueDate: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export class TaskStore {
+  constructor(private path: string = DEFAULT_FILE) {}
+
+  load(): Task[] {
+    if (existsSync(this.path)) {
+      return JSON.parse(readFileSync(this.path, "utf-8"));
+    }
+    return [];
+  }
+
+  save(tasks: Task[]): void {
+    writeFileSync(this.path, JSON.stringify(tasks, null, 2));
+  }
+
+  nextId(tasks: Task[]): number {
+    return Math.max(...tasks.map((t) => t.id), 0) + 1;
+  }
+}`}
+		/>
+
+		<p class="text-text mb-4">
+			The main file now imports from the storage module instead of handling I/O directly:
+		</p>
+
+		<CodeGroup
+			title="Updated main file using the storage module"
+			python={`# task_tracker.py (after extracting storage)
+"""Task tracker CLI — uses storage module for persistence."""
+
+from datetime import datetime, timezone
+import sys
+import click
+from storage import TaskStore
+
+VALID_PRIORITIES = ("high", "medium", "low")
+store = TaskStore()
+
+
+def time_ago(iso_str: str) -> str:
+    dt = datetime.fromisoformat(iso_str)
+    delta = datetime.now(timezone.utc) - dt
+    if delta.days > 0:
+        return f"{delta.days}d ago"
+    hours = delta.seconds // 3600
+    if hours > 0:
+        return f"{hours}h ago"
+    return f"{delta.seconds // 60}m ago"
+
+
+def priority_marker(priority: str) -> str:
+    return {"high": "!!!", "medium": "!!", "low": "!"}.get(priority, "")
+
+
+def is_overdue(task: dict) -> bool:
+    due = task.get("due_date")
+    if not due or task["done"]:
+        return False
+    return datetime.fromisoformat(due) < datetime.now(timezone.utc)
+
+
+def format_due(task: dict) -> str:
+    due = task.get("due_date")
+    if not due:
+        return ""
+    dt = datetime.fromisoformat(due)
+    label = dt.strftime("%b %d")
+    if is_overdue(task):
+        return f"OVERDUE {label}"
+    delta = dt - datetime.now(timezone.utc)
+    if delta.days <= 1:
+        return "due tomorrow"
+    return f"due {label}"
+
+
+@click.group()
+def cli():
+    """Task tracker with priorities and due dates."""
+    pass
+
+
+@cli.command()
+@click.argument("title")
+@click.option("-p", "--priority", type=click.Choice(VALID_PRIORITIES), default="medium")
+@click.option("-d", "--due", "due_date", default=None, help="Due date (YYYY-MM-DD)")
+def add(title: str, priority: str, due_date: str | None):
+    """Add a new task."""
+    tasks = store.load()
+    due_iso = None
+    if due_date:
+        due_iso = datetime.strptime(due_date, "%Y-%m-%d").replace(
+            tzinfo=timezone.utc
+        ).isoformat()
+    task = {
+        "id": store.next_id(tasks),
+        "title": title,
+        "done": False,
+        "priority": priority,
+        "due_date": due_iso,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "completed_at": None,
+    }
+    tasks.append(task)
+    store.save(tasks)
+    click.echo(f"Added task {task['id']}: {title} [{priority}]")
+
+
+@cli.command(name="list")
+@click.option("-p", "--priority", type=click.Choice(VALID_PRIORITIES), default=None)
+@click.option("--overdue", is_flag=True, help="Show only overdue tasks")
+def list_tasks(priority: str | None, overdue: bool):
+    """List tasks, optionally filtered."""
+    tasks = store.load()
+    if priority:
+        tasks = [t for t in tasks if t.get("priority") == priority]
+    if overdue:
+        tasks = [t for t in tasks if is_overdue(t)]
+    if not tasks:
+        click.echo("No matching tasks.")
+        return
+    for task in tasks:
+        status = "x" if task["done"] else " "
+        age = time_ago(task["created_at"])
+        marker = priority_marker(task.get("priority", "medium"))
+        due = format_due(task)
+        due_str = f"  {due}" if due else ""
+        click.echo(f"[{status}] {task['id']}: {task['title']}  {marker}{due_str}  ({age})")
+
+
+@cli.command()
+@click.argument("task_id", type=int)
+def done(task_id: int):
+    """Mark a task as complete."""
+    tasks = store.load()
+    for task in tasks:
+        if task["id"] == task_id:
+            task["done"] = True
+            task["completed_at"] = datetime.now(timezone.utc).isoformat()
+            store.save(tasks)
+            click.echo(f"Completed: {task['title']}")
+            return
+    click.echo(f"Task {task_id} not found.", err=True)
+    sys.exit(1)
+
+
+if __name__ == "__main__":
+    cli()`}
+			typescript={`// task_tracker.ts (after extracting storage)
+// Task tracker CLI — uses storage module for persistence.
+
+import { Command } from "commander";
+import { TaskStore } from "./storage";
+import type { Task } from "./storage";
+
+const store = new TaskStore();
+
+function timeAgo(isoStr: string): string {
+  const delta = Date.now() - new Date(isoStr).getTime();
+  const days = Math.floor(delta / 86_400_000);
+  if (days > 0) return \`\${days}d ago\`;
+  const hours = Math.floor(delta / 3_600_000);
+  if (hours > 0) return \`\${hours}h ago\`;
+  return \`\${Math.floor(delta / 60_000)}m ago\`;
+}
+
+function priorityMarker(p: Task["priority"]): string {
+  return { high: "!!!", medium: "!!", low: "!" }[p] ?? "";
+}
+
+function isOverdue(task: Task): boolean {
+  if (!task.dueDate || task.done) return false;
+  return new Date(task.dueDate).getTime() < Date.now();
+}
+
+function formatDue(task: Task): string {
+  if (!task.dueDate) return "";
+  const dt = new Date(task.dueDate);
+  const label = dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (isOverdue(task)) return \`OVERDUE \${label}\`;
+  const delta = dt.getTime() - Date.now();
+  if (delta < 86_400_000) return "due tomorrow";
+  return \`due \${label}\`;
+}
+
+const program = new Command();
+program.name("task-tracker").description("Task tracker with priorities and due dates.");
+
+program
+  .command("add <title>")
+  .description("Add a new task")
+  .option("-p, --priority <level>", "Priority (high, medium, low)", "medium")
+  .option("-d, --due <date>", "Due date (YYYY-MM-DD)")
+  .action((title: string, opts: { priority: string; due?: string }) => {
+    const priority = opts.priority as Task["priority"];
+    const dueDate = opts.due
+      ? new Date(opts.due + "T00:00:00Z").toISOString()
+      : null;
+    const tasks = store.load();
+    const task: Task = {
+      id: store.nextId(tasks),
+      title,
+      done: false,
+      priority,
+      dueDate,
+      createdAt: new Date().toISOString(),
+      completedAt: null,
+    };
+    tasks.push(task);
+    store.save(tasks);
+    console.log(\`Added task \${task.id}: \${title} [\${priority}]\`);
+  });
+
+program
+  .command("list")
+  .description("List tasks, optionally filtered")
+  .option("-p, --priority <level>", "Filter by priority")
+  .option("--overdue", "Show only overdue tasks")
+  .action((opts: { priority?: string; overdue?: boolean }) => {
+    let tasks = store.load();
+    if (opts.priority) {
+      tasks = tasks.filter((t) => t.priority === opts.priority);
+    }
+    if (opts.overdue) {
+      tasks = tasks.filter(isOverdue);
+    }
+    if (tasks.length === 0) {
+      console.log("No matching tasks.");
+      return;
+    }
+    for (const task of tasks) {
+      const status = task.done ? "x" : " ";
+      const age = timeAgo(task.createdAt);
+      const marker = priorityMarker(task.priority);
+      const due = formatDue(task);
+      const dueStr = due ? \`  \${due}\` : "";
+      console.log(\`[\${status}] \${task.id}: \${task.title}  \${marker}\${dueStr}  (\${age})\`);
+    }
+  });
+
+program
+  .command("done <taskId>")
+  .description("Mark a task as complete")
+  .action((taskId: string) => {
+    const tasks = store.load();
+    const task = tasks.find((t) => t.id === parseInt(taskId));
+    if (!task) {
+      console.error(\`Task \${taskId} not found.\`);
+      process.exit(1);
+    }
+    task.done = true;
+    task.completedAt = new Date().toISOString();
+    store.save(tasks);
+    console.log(\`Completed: \${task.title}\`);
+  });
+
+program.parse();`}
+		/>
+
+		<p class="text-text mb-4">
+			Now the critical moment — run the tests from Slice 1 against the refactored code:
+		</p>
+
+		<CodeGroup
+			title="Verification — tests still pass after extraction"
+			python={`pytest test_task_tracker.py -v
+
+# test_task_tracker.py::TestAdd::test_add_basic PASSED
+# test_task_tracker.py::TestAdd::test_add_with_priority PASSED
+# test_task_tracker.py::TestAdd::test_add_with_due_date PASSED
+# test_task_tracker.py::TestList::test_list_empty PASSED
+# test_task_tracker.py::TestList::test_list_shows_tasks PASSED
+# test_task_tracker.py::TestList::test_list_filter_priority PASSED
+# test_task_tracker.py::TestDone::test_mark_done PASSED
+# test_task_tracker.py::TestDone::test_done_not_found PASSED
+
+# 8 passed in 0.31s ✅ All green — storage extraction preserved behavior`}
+			typescript={`npx vitest run
+
+# ✓ task_tracker.test.ts (7)
+#   ✓ add (3)
+#     ✓ adds a task with default priority
+#     ✓ adds a task with custom priority
+#     ✓ adds a task with due date
+#   ✓ list (3)
+#     ✓ shows empty message when no tasks
+#     ✓ shows added tasks
+#     ✓ filters by priority
+#   ✓ done (2)
+#     ✓ marks a task as complete
+#     ✓ exits with error for missing task
+
+# Test Files  1 passed (1)
+# Tests  8 passed (8) ✅ All green — storage extraction preserved behavior`}
+		/>
+
+		<p class="text-text mb-4">
+			All eight tests pass. The storage is now behind a clean interface, but the behavior is identical. If we wanted to swap JSON for SQLite later, we'd only change <code class="text-accent">storage.py</code> (or <code class="text-accent">storage.ts</code>) — nothing else.
+		</p>
+		<p class="text-text mb-6">
+			GSD's reassessment step confirms the extraction went cleanly and the Slice 3 plan is still valid.
+		</p>
+	</section>
+
+	<!-- Section 5: Slice 3 — Separate Business Logic -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Slice 3: Separate Business Logic from CLI</h2>
+		<p class="text-text mb-4">
+			The final slice extracts the core logic — adding tasks, marking them done, filtering — into a service module. The CLI file becomes a thin shell that parses arguments and calls the service. This makes the business logic testable without invoking the CLI.
+		</p>
+
+		<CodeGroup
+			title="Task service — business logic separated from CLI"
+			python={`# service.py
+"""Task operations — business logic independent of CLI framework."""
+
+from datetime import datetime, timezone
+from storage import TaskStore
+
+
+class TaskService:
+    def __init__(self, store: TaskStore | None = None):
+        self.store = store or TaskStore()
+
+    def add_task(self, title: str, priority: str = "medium",
+                 due_date: str | None = None) -> dict:
+        tasks = self.store.load()
+        due_iso = None
+        if due_date:
+            due_iso = datetime.strptime(due_date, "%Y-%m-%d").replace(
+                tzinfo=timezone.utc
+            ).isoformat()
+        task = {
+            "id": self.store.next_id(tasks),
+            "title": title,
+            "done": False,
+            "priority": priority,
+            "due_date": due_iso,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": None,
+        }
+        tasks.append(task)
+        self.store.save(tasks)
+        return task
+
+    def list_tasks(self, priority: str | None = None,
+                   overdue_only: bool = False) -> list[dict]:
+        tasks = self.store.load()
+        if priority:
+            tasks = [t for t in tasks if t.get("priority") == priority]
+        if overdue_only:
+            tasks = [t for t in tasks if self.is_overdue(t)]
+        return tasks
+
+    def complete_task(self, task_id: int) -> dict | None:
+        tasks = self.store.load()
+        for task in tasks:
+            if task["id"] == task_id:
+                task["done"] = True
+                task["completed_at"] = datetime.now(timezone.utc).isoformat()
+                self.store.save(tasks)
+                return task
+        return None
+
+    @staticmethod
+    def is_overdue(task: dict) -> bool:
+        due = task.get("due_date")
+        if not due or task["done"]:
+            return False
+        return datetime.fromisoformat(due) < datetime.now(timezone.utc)`}
+			typescript={`// service.ts
+// Task operations — business logic independent of CLI framework.
+
+import { TaskStore } from "./storage";
+import type { Task } from "./storage";
+
+export class TaskService {
+  constructor(private store: TaskStore = new TaskStore()) {}
+
+  addTask(title: string, priority: Task["priority"] = "medium",
+          dueDate?: string): Task {
+    const tasks = this.store.load();
+    const dueDateIso = dueDate
+      ? new Date(dueDate + "T00:00:00Z").toISOString()
+      : null;
+    const task: Task = {
+      id: this.store.nextId(tasks),
+      title,
+      done: false,
+      priority,
+      dueDate: dueDateIso,
+      createdAt: new Date().toISOString(),
+      completedAt: null,
+    };
+    tasks.push(task);
+    this.store.save(tasks);
+    return task;
+  }
+
+  listTasks(priority?: Task["priority"],
+            overdueOnly: boolean = false): Task[] {
+    let tasks = this.store.load();
+    if (priority) {
+      tasks = tasks.filter((t) => t.priority === priority);
+    }
+    if (overdueOnly) {
+      tasks = tasks.filter((t) => this.isOverdue(t));
+    }
+    return tasks;
+  }
+
+  completeTask(taskId: number): Task | null {
+    const tasks = this.store.load();
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return null;
+    task.done = true;
+    task.completedAt = new Date().toISOString();
+    this.store.save(tasks);
+    return task;
+  }
+
+  isOverdue(task: Task): boolean {
+    if (!task.dueDate || task.done) return false;
+    return new Date(task.dueDate).getTime() < Date.now();
+  }
+}`}
+		/>
+
+		<p class="text-text mb-4">
+			The CLI becomes thin — just argument parsing and output formatting:
+		</p>
+
+		<CodeGroup
+			title="Thin CLI shell after full extraction"
+			python={`# task_tracker.py (final — thin CLI shell)
+"""Task tracker CLI — delegates to service layer."""
+
+from datetime import datetime, timezone
+import sys
+import click
+from service import TaskService
+
+VALID_PRIORITIES = ("high", "medium", "low")
+svc = TaskService()
+
+
+def time_ago(iso_str: str) -> str:
+    dt = datetime.fromisoformat(iso_str)
+    delta = datetime.now(timezone.utc) - dt
+    if delta.days > 0:
+        return f"{delta.days}d ago"
+    hours = delta.seconds // 3600
+    if hours > 0:
+        return f"{hours}h ago"
+    return f"{delta.seconds // 60}m ago"
+
+
+def priority_marker(priority: str) -> str:
+    return {"high": "!!!", "medium": "!!", "low": "!"}.get(priority, "")
+
+
+def format_due(task: dict) -> str:
+    due = task.get("due_date")
+    if not due:
+        return ""
+    dt = datetime.fromisoformat(due)
+    label = dt.strftime("%b %d")
+    if svc.is_overdue(task):
+        return f"OVERDUE {label}"
+    delta = dt - datetime.now(timezone.utc)
+    if delta.days <= 1:
+        return "due tomorrow"
+    return f"due {label}"
+
+
+@click.group()
+def cli():
+    """Task tracker with priorities and due dates."""
+    pass
+
+
+@cli.command()
+@click.argument("title")
+@click.option("-p", "--priority", type=click.Choice(VALID_PRIORITIES), default="medium")
+@click.option("-d", "--due", "due_date", default=None, help="Due date (YYYY-MM-DD)")
+def add(title: str, priority: str, due_date: str | None):
+    """Add a new task."""
+    task = svc.add_task(title, priority, due_date)
+    click.echo(f"Added task {task['id']}: {title} [{priority}]")
+
+
+@cli.command(name="list")
+@click.option("-p", "--priority", type=click.Choice(VALID_PRIORITIES), default=None)
+@click.option("--overdue", is_flag=True, help="Show only overdue tasks")
+def list_tasks(priority: str | None, overdue: bool):
+    """List tasks, optionally filtered."""
+    tasks = svc.list_tasks(priority, overdue)
+    if not tasks:
+        click.echo("No matching tasks.")
+        return
+    for task in tasks:
+        status = "x" if task["done"] else " "
+        age = time_ago(task["created_at"])
+        marker = priority_marker(task.get("priority", "medium"))
+        due = format_due(task)
+        due_str = f"  {due}" if due else ""
+        click.echo(f"[{status}] {task['id']}: {task['title']}  {marker}{due_str}  ({age})")
+
+
+@cli.command()
+@click.argument("task_id", type=int)
+def done(task_id: int):
+    """Mark a task as complete."""
+    task = svc.complete_task(task_id)
+    if task:
+        click.echo(f"Completed: {task['title']}")
+    else:
+        click.echo(f"Task {task_id} not found.", err=True)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    cli()`}
+			typescript={`// task_tracker.ts (final — thin CLI shell)
+// Task tracker CLI — delegates to service layer.
+
+import { Command } from "commander";
+import { TaskService } from "./service";
+import type { Task } from "./storage";
+
+const svc = new TaskService();
+
+function timeAgo(isoStr: string): string {
+  const delta = Date.now() - new Date(isoStr).getTime();
+  const days = Math.floor(delta / 86_400_000);
+  if (days > 0) return \`\${days}d ago\`;
+  const hours = Math.floor(delta / 3_600_000);
+  if (hours > 0) return \`\${hours}h ago\`;
+  return \`\${Math.floor(delta / 60_000)}m ago\`;
+}
+
+function priorityMarker(p: Task["priority"]): string {
+  return { high: "!!!", medium: "!!", low: "!" }[p] ?? "";
+}
+
+function formatDue(task: Task): string {
+  if (!task.dueDate) return "";
+  const dt = new Date(task.dueDate);
+  const label = dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (svc.isOverdue(task)) return \`OVERDUE \${label}\`;
+  const delta = dt.getTime() - Date.now();
+  if (delta < 86_400_000) return "due tomorrow";
+  return \`due \${label}\`;
+}
+
+const program = new Command();
+program.name("task-tracker").description("Task tracker with priorities and due dates.");
+
+program
+  .command("add <title>")
+  .description("Add a new task")
+  .option("-p, --priority <level>", "Priority (high, medium, low)", "medium")
+  .option("-d, --due <date>", "Due date (YYYY-MM-DD)")
+  .action((title: string, opts: { priority: string; due?: string }) => {
+    const task = svc.addTask(title, opts.priority as Task["priority"], opts.due);
+    console.log(\`Added task \${task.id}: \${title} [\${task.priority}]\`);
+  });
+
+program
+  .command("list")
+  .description("List tasks, optionally filtered")
+  .option("-p, --priority <level>", "Filter by priority")
+  .option("--overdue", "Show only overdue tasks")
+  .action((opts: { priority?: string; overdue?: boolean }) => {
+    const tasks = svc.listTasks(
+      opts.priority as Task["priority"] | undefined,
+      opts.overdue ?? false
+    );
+    if (tasks.length === 0) {
+      console.log("No matching tasks.");
+      return;
+    }
+    for (const task of tasks) {
+      const status = task.done ? "x" : " ";
+      const age = timeAgo(task.createdAt);
+      const marker = priorityMarker(task.priority);
+      const due = formatDue(task);
+      const dueStr = due ? \`  \${due}\` : "";
+      console.log(\`[\${status}] \${task.id}: \${task.title}  \${marker}\${dueStr}  (\${age})\`);
+    }
+  });
+
+program
+  .command("done <taskId>")
+  .description("Mark a task as complete")
+  .action((taskId: string) => {
+    const task = svc.completeTask(parseInt(taskId));
+    if (task) {
+      console.log(\`Completed: \${task.title}\`);
+    } else {
+      console.error(\`Task \${taskId} not found.\`);
+      process.exit(1);
+    }
+  });
+
+program.parse();`}
+		/>
+
+		<p class="text-text mb-4">
+			Final verification — the original tests still pass, and the project structure is clean:
+		</p>
+
+		<div class="rounded-lg border border-border bg-surface p-6 mb-6">
+			<p class="text-text-muted text-sm mb-3">Final project structure:</p>
+			<pre class="text-text font-mono text-sm leading-relaxed"><code>task-tracker/
+├── storage.py (or .ts)    ← data persistence
+├── service.py (or .ts)    ← business logic
+├── task_tracker.py (or .ts) ← thin CLI shell
+├── test_task_tracker.py (or .test.ts) ← behavioral tests
+├── tasks.json
+└── .gsd/
+    ├── DECISIONS.md        ← "tests first, then refactor"
+    └── milestones/M001/    ← full execution history</code></pre>
+		</div>
+
+		<p class="text-text mb-6">
+			Three files, clear responsibilities. The CLI parses arguments and formats output. The service contains business logic. The storage handles persistence. Each can change independently. Each is testable in isolation.
+		</p>
+	</section>
+
+	<!-- Section 6: What Made This Safe -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">What Made This Safe</h2>
+		<p class="text-text mb-4">
+			Let's be honest about what just happened. We took a working, single-file CLI and split it into three modules. That's the kind of change where things quietly break — an import path is wrong, a function signature changed, a field name got mistyped. Here's what GSD did differently:
+		</p>
+
+		<div class="space-y-4 mb-6">
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">Tests came first, not last</p>
+				<p class="text-text-muted text-sm">The tests were written against the working code before any refactoring started. They captured the real behavior — not the intended behavior. That distinction matters when you're changing how the code is organized but not what it does.</p>
+			</div>
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">One structural change per slice</p>
+				<p class="text-text-muted text-sm">Slice 2 extracted storage. Slice 3 extracted business logic. We never did both at once. When tests fail after a single change, you know exactly what broke. When tests fail after two simultaneous changes, you're debugging a combinatorial explosion.</p>
+			</div>
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">Same tests, different structure</p>
+				<p class="text-text-muted text-sm">The test suite didn't change between slices. It tested through the CLI interface, which means it verified behavior regardless of how the internals were organized. If the tests pass, the refactoring preserved the contract.</p>
+			</div>
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">Reassessment caught nothing — and that's the point</p>
+				<p class="text-text-muted text-sm">After each slice, GSD reassessed the roadmap. In this case, nothing changed — the plan was still valid. But if Slice 2 had revealed that the storage interface needed a different shape, GSD would have replanned Slice 3 before we built on a shaky foundation.</p>
+			</div>
+		</div>
+
+		<p class="text-text mb-6">
+			Contrast this with the typical refactoring experience: open the file, start moving things around, tests break (if they exist), fix the tests, realize another file depends on the old structure, fix that too, run the app, something's subtly wrong, spend 45 minutes debugging. GSD replaces that chaos with a sequence of small, verified steps.
+		</p>
+	</section>
+
+	<!-- Section 7: Key Takeaways & Next Steps -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Key Takeaways</h2>
+
+		<ul class="text-text space-y-3 mb-8 list-none pl-0">
+			<li class="flex items-start gap-3">
+				<span class="text-accent mt-1 shrink-0">&#9656;</span>
+				<span><strong class="text-heading">Tests before refactoring.</strong> Always. The tests are the contract that proves behavior didn't change. Write them against the working code, then refactor behind them.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-accent mt-1 shrink-0">&#9656;</span>
+				<span><strong class="text-heading">One change per slice.</strong> Extract one concern at a time. Run the tests between each extraction. Small steps compound into safe transformations.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-accent mt-1 shrink-0">&#9656;</span>
+				<span><strong class="text-heading">Refactoring is structured work.</strong> It feels like "just moving code around," but it's the most error-prone kind of change. GSD treats it with the same rigor as new features — planned, sliced, verified.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-accent mt-1 shrink-0">&#9656;</span>
+				<span><strong class="text-heading">Good architecture is a destination, not a starting point.</strong> The single-file version was right for Tutorial 1. The three-module version is right now. GSD helps you evolve from one to the other safely.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-accent mt-1 shrink-0">&#9656;</span>
+				<span><strong class="text-heading">The investment pays forward.</strong> The task tracker is now structured for growth. New features go in <code class="text-accent">service.py</code>. Storage changes stay in <code class="text-accent">storage.py</code>. The CLI stays thin. Future work is easier because of the work you did today.</span>
+			</li>
+		</ul>
+
+		<h2 class="text-2xl font-semibold text-heading mb-4">Where to Go from Here</h2>
+		<p class="text-text mb-4">
+			Over three tutorials, you've gone from zero to a well-structured, tested CLI application — built entirely through AI-assisted development with Claude Code and GSD.
+		</p>
+		<p class="text-text mb-4">
+			<a href={`${base}tutorials/claude-code-fundamentals`} class="text-accent hover:text-accent-hover transition-colors underline">Tutorial 1</a> taught you to work with Claude Code. <a href={`${base}tutorials/building-features-with-gsd`} class="text-accent hover:text-accent-hover transition-colors underline">Tutorial 2</a> taught you to plan and execute features with GSD. This tutorial taught you to refactor safely — the skill that separates code that grows from code that rots.
+		</p>
+		<p class="text-text mb-6">
+			The patterns scale. The same plan-execute-verify loop works for database migrations, API redesigns, monolith-to-microservice splits, and framework upgrades. The tools are the same. The discipline is the same. Start with tests, change one thing at a time, verify at every step.
+		</p>
+
+		<div class="flex justify-center">
+			<a
+				href={base}
+				class="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-heading font-medium hover:bg-accent-hover transition-colors"
+			>
+				Back to all tutorials
+				<span>&rarr;</span>
+			</a>
+		</div>
+	</section>
+
+</TutorialLayout>
