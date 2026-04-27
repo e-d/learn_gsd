@@ -1,0 +1,714 @@
+---
+import TutorialLayout from '../../layouts/TutorialLayout.astro';
+import CodeGroup from '../../components/CodeGroup.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<TutorialLayout title="GSD on an Existing Codebase" description="Use GSD to plan and build a feature in a large, unfamiliar open-source project — FastAPI's rate-limiting middleware.">
+
+	<!-- Section 1: When the Codebase Isn't Yours -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">When the Codebase Isn't Yours</h2>
+		<p class="text-text mb-4">
+			Tutorials 1 through 3 built a project from scratch. You knew every line because you wrote every line. Real work is rarely like that. More often, you're dropped into an existing codebase — thousands of files, conventions you didn't choose, patterns you need to discover before you can follow them.
+		</p>
+		<p class="text-text mb-4">
+			This is where most AI-assisted coding falls apart. You paste code into Claude Code, ask it to "add a feature," and it generates something that looks right but doesn't follow the project's patterns, breaks existing tests, or conflicts with architectural decisions made months ago. The AI doesn't know what it doesn't know about the codebase.
+		</p>
+		<p class="text-text mb-4">
+			GSD handles this differently. Before any code is written, GSD's research and discuss phases map the codebase — discovering patterns, conventions, and constraints that must be respected. The planning phase then creates tasks that work <em>with</em> the existing architecture, not against it.
+		</p>
+		<p class="text-text mb-6">
+			In this tutorial, you'll use GSD to build a <strong class="text-heading">rate-limiting middleware</strong> for <a href="https://github.com/fastapi/fastapi" class="text-accent hover:text-accent-hover transition-colors underline">FastAPI</a>, a popular Python web framework with 80k+ GitHub stars, extensive test coverage, and non-trivial internals. You'll see how GSD's workflow adapts when the challenge isn't writing code from scratch — it's understanding enough of someone else's code to extend it safely.
+		</p>
+	</section>
+
+	<!-- Section 2: Forking and Setting Up -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Setting the Stage</h2>
+		<p class="text-text mb-4">
+			Start by forking and cloning FastAPI. You'll work on a branch so the feature stays isolated:
+		</p>
+
+		<CodeGroup
+			title="Clone and set up"
+			python={`git clone https://github.com/YOUR_USERNAME/fastapi.git
+cd fastapi
+git checkout -b feature/rate-limiting
+
+# Install dev dependencies
+pip install -e ".[all]"
+pip install -r requirements-tests.txt
+
+# Start Claude Code — GSD commands are available
+claude`}
+		/>
+
+		<p class="text-text mb-4">
+			Run <code class="text-accent">/gsd-new-project</code> to initialize GSD. This is where things get interesting. Unlike Tutorial 2 where GSD initialized on a tiny project, here it's scanning a codebase with hundreds of files. GSD asks you about the project, then researches the structure:
+		</p>
+
+		<div class="rounded-lg border border-border bg-surface p-6 mb-6">
+			<p class="text-text-muted text-sm mb-3">GSD researches the codebase and discovers:</p>
+			<div class="space-y-2">
+				<div class="flex items-start gap-3">
+					<span class="text-accent shrink-0">&#9656;</span>
+					<span class="text-text text-sm"><strong class="text-heading">Framework structure</strong> — ASGI-based, middleware uses <code class="text-accent text-xs">BaseHTTPMiddleware</code> or raw ASGI protocol</span>
+				</div>
+				<div class="flex items-start gap-3">
+					<span class="text-accent shrink-0">&#9656;</span>
+					<span class="text-text text-sm"><strong class="text-heading">Dependency injection</strong> — <code class="text-accent text-xs">Depends()</code> pattern for per-route configuration</span>
+				</div>
+				<div class="flex items-start gap-3">
+					<span class="text-accent shrink-0">&#9656;</span>
+					<span class="text-text text-sm"><strong class="text-heading">Test patterns</strong> — pytest with <code class="text-accent text-xs">TestClient</code>, tests mirror source structure in <code class="text-accent text-xs">tests/</code></span>
+				</div>
+				<div class="flex items-start gap-3">
+					<span class="text-accent shrink-0">&#9656;</span>
+					<span class="text-text text-sm"><strong class="text-heading">Existing middleware</strong> — CORS, GZip, TrustedHost already implemented as reference patterns</span>
+				</div>
+			</div>
+		</div>
+
+		<p class="text-text mb-6">
+			This research phase is the key difference from greenfield work. GSD doesn't just ask "what do you want to build?" — it asks "what does this codebase expect?" The conventions it discovers become constraints on the plan. Your rate limiter won't be built from first principles; it'll be built to fit FastAPI's existing patterns.
+		</p>
+	</section>
+
+	<!-- Section 3: Research Phase -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Research: Understanding the Architecture</h2>
+		<p class="text-text mb-4">
+			Before discussing the feature, GSD needs to understand how FastAPI's middleware system works. During the discuss phase, GSD digs into the existing middleware implementations. Here's what it finds by reading <code class="text-accent">fastapi/middleware/</code> and the ASGI internals:
+		</p>
+
+		<div class="rounded-lg border border-border bg-surface p-6 mb-6">
+			<p class="text-text-muted text-sm mb-3">Key findings from GSD's research:</p>
+			<pre class="text-text font-mono text-sm leading-relaxed"><code>FastAPI Middleware Architecture
+==============================
+
+1. Two middleware patterns coexist:
+   - BaseHTTPMiddleware (simple, request/response model)
+   - Pure ASGI middleware (lower-level, better performance)
+   → Existing middleware uses pure ASGI pattern
+
+2. Middleware is added via app.add_middleware():
+   - CORSMiddleware, GZipMiddleware, TrustedHostMiddleware
+   - Each takes config params in __init__
+   - Each follows the same dispatch pattern
+
+3. Dependency injection (Depends):
+   - Can provide per-route overrides
+   - Runs AFTER middleware, not before
+   - Useful for route-specific rate limit config
+
+4. Test patterns:
+   - tests/test_middleware_*.py naming convention
+   - TestClient from starlette.testclient
+   - Async tests via pytest-anyio when needed
+
+5. OpenAPI integration:
+   - 429 responses should appear in OpenAPI schema
+   - Use responses parameter on route decorators</code></pre>
+		</div>
+
+		<p class="text-text mb-4">
+			This research surfaces a critical insight: <strong class="text-heading">middleware runs before dependency injection</strong>. That means the rate limiter's core check must live in middleware (to catch requests early), but per-route configuration needs a different mechanism. GSD flags this in the discussion as an architectural constraint that shapes the plan.
+		</p>
+		<p class="text-text mb-6">
+			If you'd skipped research and jumped straight to coding, you'd have discovered this constraint halfway through implementation — after building a dependency-injection-based rate limiter that can't actually intercept requests early enough. The research phase catches these misunderstandings when they're free to fix.
+		</p>
+	</section>
+
+	<!-- Section 4: Discussing the Approach -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Discussing the Approach</h2>
+		<p class="text-text mb-4">
+			With the research in hand, <code class="text-accent">/gsd-discuss-phase</code> walks through the design decisions. Here's what GSD and you work through together:
+		</p>
+
+		<div class="rounded-lg border border-border bg-surface p-6 mb-6">
+			<p class="text-text-muted text-sm mb-2">Your prompt:</p>
+			<p class="text-text font-mono text-sm">
+				I want to add a rate-limiting middleware to FastAPI. It should use a token bucket algorithm, support global and per-route limits, return proper 429 responses with Retry-After headers, and integrate with FastAPI's OpenAPI schema.
+			</p>
+		</div>
+
+		<p class="text-text mb-4">
+			The discuss phase resolves the gray areas that research surfaced:
+		</p>
+
+		<div class="space-y-4 mb-6">
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">Where does state live?</p>
+				<p class="text-text-muted text-sm">Token bucket counters need shared state. For this tutorial, in-memory storage (a dictionary) keeps things simple. A production version would use Redis, but the storage interface should be pluggable so the swap is easy later. GSD records this as a decision in <code class="text-accent text-xs">.planning/STATE.md</code>.</p>
+			</div>
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">Middleware vs. dependency?</p>
+				<p class="text-text-muted text-sm">Research showed middleware runs before DI. The design: middleware handles the global rate check. Per-route overrides use a different pattern — route decorators that set metadata the middleware reads. This keeps the fast path in middleware while allowing route-level configuration.</p>
+			</div>
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">What identifies a client?</p>
+				<p class="text-text-muted text-sm">Default to client IP from the request. Support a configurable key function so users can identify by API key, user ID, or custom logic. The key function takes a <code class="text-accent text-xs">Request</code> and returns a string.</p>
+			</div>
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">How should it follow FastAPI's patterns?</p>
+				<p class="text-text-muted text-sm">Match the existing middleware style exactly: pure ASGI middleware class, config via <code class="text-accent text-xs">__init__</code> params, added via <code class="text-accent text-xs">app.add_middleware()</code>. Tests follow the <code class="text-accent text-xs">tests/test_middleware_*.py</code> convention. This isn't a style choice — it's a constraint from research.</p>
+			</div>
+		</div>
+
+		<p class="text-text mb-6">
+			Every one of these decisions came from reading the codebase first. The discuss phase didn't invent patterns — it discovered what FastAPI expects and designed the feature to fit. These decisions are now recorded in <code class="text-accent">.planning/STATE.md</code>, so every plan executes with the same understanding.
+		</p>
+	</section>
+
+	<!-- Section 5: Planning the Feature -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Planning the Feature</h2>
+		<p class="text-text mb-4">
+			<code class="text-accent">/gsd-plan-phase</code> creates atomic plans. This feature decomposes into four plans — more than Tutorials 2 and 3 because an existing codebase requires more careful integration:
+		</p>
+
+		<div class="rounded-lg border border-border bg-surface p-6 mb-6">
+			<p class="text-text-muted text-sm mb-3">GSD's plans for rate limiting:</p>
+			<div class="space-y-3">
+				<div class="flex items-start gap-3">
+					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">Plan 1</span>
+					<div>
+						<p class="text-heading text-sm font-medium">Token bucket algorithm + storage interface</p>
+						<p class="text-text-muted text-sm">After this: standalone, tested rate limiter with pluggable storage — no FastAPI dependency yet</p>
+					</div>
+				</div>
+				<div class="flex items-start gap-3">
+					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">Plan 2</span>
+					<div>
+						<p class="text-heading text-sm font-medium">ASGI middleware integration</p>
+						<p class="text-text-muted text-sm">After this: middleware intercepts requests, returns 429 with Retry-After, follows FastAPI's middleware patterns</p>
+					</div>
+				</div>
+				<div class="flex items-start gap-3">
+					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">Plan 3</span>
+					<div>
+						<p class="text-heading text-sm font-medium">Per-route configuration + OpenAPI integration</p>
+						<p class="text-text-muted text-sm">After this: routes can override the global limit, 429 responses appear in OpenAPI schema</p>
+					</div>
+				</div>
+				<div class="flex items-start gap-3">
+					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">Plan 4</span>
+					<div>
+						<p class="text-heading text-sm font-medium">Integration tests + existing test suite verification</p>
+						<p class="text-text-muted text-sm">After this: full integration tests pass, <strong>existing FastAPI tests still pass</strong> — no regressions</p>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<p class="text-text mb-4">
+			Notice Plan 4. In Tutorials 2 and 3, verification happened within each plan — run the tests, check the output, move on. Here, there's a dedicated plan for running FastAPI's <em>existing</em> test suite. This is the difference with an established codebase: <strong class="text-heading">your feature must not break what's already there</strong>. Plan 4 proves that.
+		</p>
+		<p class="text-text mb-6">
+			Also notice Plan 1 has no FastAPI dependency. The token bucket is pure logic — it can be tested without any web framework. This isolation makes Plan 1 fast to execute and easy to verify. If the algorithm is wrong, you find out before any middleware wiring happens.
+		</p>
+	</section>
+
+	<!-- Section 6: Plan 1 — Token Bucket -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Plan 1: Token Bucket Algorithm</h2>
+		<p class="text-text mb-4">
+			GSD executes Plan 1 with a fresh context that reads the plan and the relevant parts of the FastAPI codebase. The token bucket algorithm is straightforward: each client gets a bucket of tokens. Each request consumes one token. Tokens refill at a fixed rate. When the bucket is empty, the request is rejected.
+		</p>
+
+		<CodeGroup
+			title="fastapi/middleware/ratelimit.py — Token bucket core"
+			python={`"""Rate limiting with token bucket algorithm."""
+
+import time
+from typing import Protocol
+
+
+class RateLimitStorage(Protocol):
+    """Interface for rate limit state storage."""
+
+    def get_tokens(self, key: str) -> tuple[float, float]:
+        """Return (tokens_remaining, last_refill_timestamp)."""
+        ...
+
+    def set_tokens(self, key: str, tokens: float, timestamp: float) -> None:
+        """Update token count and timestamp for a key."""
+        ...
+
+
+class InMemoryStorage:
+    """In-memory token storage. Suitable for single-process apps."""
+
+    def __init__(self) -> None:
+        self._buckets: dict[str, tuple[float, float]] = {}
+
+    def get_tokens(self, key: str) -> tuple[float, float]:
+        return self._buckets.get(key, (-1.0, 0.0))
+
+    def set_tokens(self, key: str, tokens: float, timestamp: float) -> None:
+        self._buckets[key] = (tokens, timestamp)
+
+
+class TokenBucket:
+    """Token bucket rate limiter.
+
+    Args:
+        rate: Number of tokens added per second.
+        capacity: Maximum tokens in the bucket.
+        storage: Where to persist bucket state.
+    """
+
+    def __init__(
+        self,
+        rate: float,
+        capacity: int,
+        storage: RateLimitStorage | None = None,
+    ) -> None:
+        self.rate = rate
+        self.capacity = capacity
+        self.storage = storage or InMemoryStorage()
+
+    def consume(self, key: str) -> tuple[bool, float]:
+        """Try to consume a token. Returns (allowed, retry_after_seconds)."""
+        now = time.monotonic()
+        tokens, last_refill = self.storage.get_tokens(key)
+
+        if tokens < 0:
+            # First request — initialize bucket
+            tokens = self.capacity - 1
+            self.storage.set_tokens(key, tokens, now)
+            return True, 0.0
+
+        # Refill tokens based on elapsed time
+        elapsed = now - last_refill
+        tokens = min(self.capacity, tokens + elapsed * self.rate)
+
+        if tokens >= 1.0:
+            tokens -= 1.0
+            self.storage.set_tokens(key, tokens, now)
+            return True, 0.0
+
+        # Not enough tokens — calculate retry delay
+        retry_after = (1.0 - tokens) / self.rate
+        self.storage.set_tokens(key, tokens, now)
+        return False, retry_after`}
+		/>
+
+		<p class="text-text mb-4">
+			The <code class="text-accent">RateLimitStorage</code> protocol means the storage is pluggable from day one. The in-memory implementation works for this tutorial; swapping in Redis later means implementing two methods. GSD recorded this decision during the discuss phase.
+		</p>
+		<p class="text-text mb-4">
+			Now the tests — pure logic, no web framework involved:
+		</p>
+
+		<CodeGroup
+			title="tests/test_ratelimit_core.py — Unit tests"
+			python={`import time
+from unittest.mock import patch
+from fastapi.middleware.ratelimit import TokenBucket, InMemoryStorage
+
+
+def test_allows_requests_within_capacity():
+    bucket = TokenBucket(rate=10.0, capacity=5)
+    for _ in range(5):
+        allowed, _ = bucket.consume("client-1")
+        assert allowed is True
+
+
+def test_rejects_when_exhausted():
+    bucket = TokenBucket(rate=10.0, capacity=2)
+    bucket.consume("client-1")
+    bucket.consume("client-1")
+    allowed, retry_after = bucket.consume("client-1")
+    assert allowed is False
+    assert retry_after > 0
+
+
+def test_tokens_refill_over_time():
+    bucket = TokenBucket(rate=10.0, capacity=2)
+    bucket.consume("client-1")
+    bucket.consume("client-1")
+
+    # Simulate time passing
+    with patch("time.monotonic", return_value=time.monotonic() + 1.0):
+        allowed, _ = bucket.consume("client-1")
+        assert allowed is True
+
+
+def test_separate_keys_have_separate_buckets():
+    bucket = TokenBucket(rate=10.0, capacity=1)
+    bucket.consume("client-1")
+    allowed, _ = bucket.consume("client-2")
+    assert allowed is True
+
+
+def test_retry_after_is_accurate():
+    bucket = TokenBucket(rate=1.0, capacity=1)
+    bucket.consume("client-1")
+    _, retry_after = bucket.consume("client-1")
+    assert 0.5 < retry_after <= 1.0
+
+
+def test_storage_interface():
+    storage = InMemoryStorage()
+    storage.set_tokens("key", 5.0, 100.0)
+    tokens, ts = storage.get_tokens("key")
+    assert tokens == 5.0
+    assert ts == 100.0`}
+		/>
+
+		<p class="text-text mb-4">
+			GSD verifies Plan 1 by running these tests:
+		</p>
+
+		<CodeGroup
+			title="Verification"
+			python={`pytest tests/test_ratelimit_core.py -v
+
+# tests/test_ratelimit_core.py::test_allows_requests_within_capacity PASSED
+# tests/test_ratelimit_core.py::test_rejects_when_exhausted PASSED
+# tests/test_ratelimit_core.py::test_tokens_refill_over_time PASSED
+# tests/test_ratelimit_core.py::test_separate_keys_have_separate_buckets PASSED
+# tests/test_ratelimit_core.py::test_retry_after_is_accurate PASSED
+# tests/test_ratelimit_core.py::test_storage_interface PASSED
+#
+# 6 passed in 0.12s`}
+		/>
+
+		<p class="text-text mb-6">
+			Six tests, all green. The algorithm works in isolation. No FastAPI imports, no HTTP, no ASGI. If there's a bug in the token math, we know before any integration happens. GSD commits this atomically.
+		</p>
+	</section>
+
+	<!-- Section 7: Plan 2 — Middleware Integration -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Plan 2: ASGI Middleware Integration</h2>
+		<p class="text-text mb-4">
+			Plan 2 runs with a fresh context. It reads the plan and the current code — which now includes the token bucket from Plan 1. The goal: wrap the rate limiter in an ASGI middleware that follows FastAPI's existing patterns.
+		</p>
+		<p class="text-text mb-4">
+			This is where respecting the codebase matters most. GSD's plan specifies: "Follow the same pattern as <code class="text-accent">CORSMiddleware</code> — pure ASGI class, config via <code class="text-accent">__init__</code>, added via <code class="text-accent">app.add_middleware()</code>." The plan doesn't just say what to build; it says how to build it so it looks like it belongs.
+		</p>
+
+		<CodeGroup
+			title="fastapi/middleware/ratelimit.py — Middleware class (added below TokenBucket)"
+			python={`from starlette.requests import Request
+from starlette.responses import Response
+from starlette.types import ASGIApp, Receive, Scope, Send
+from typing import Callable
+
+
+class RateLimitMiddleware:
+    """ASGI middleware for rate limiting.
+
+    Usage:
+        app.add_middleware(
+            RateLimitMiddleware,
+            rate=10.0,        # 10 tokens per second
+            capacity=100,     # burst capacity
+        )
+    """
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        rate: float = 10.0,
+        capacity: int = 100,
+        storage: RateLimitStorage | None = None,
+        key_func: Callable[[Request], str] | None = None,
+    ) -> None:
+        self.app = app
+        self.bucket = TokenBucket(rate=rate, capacity=capacity, storage=storage)
+        self.key_func = key_func or self._default_key
+
+    @staticmethod
+    def _default_key(request: Request) -> str:
+        if request.client:
+            return request.client.host
+        return "anonymous"
+
+    async def __call__(
+        self, scope: Scope, receive: Receive, send: Send
+    ) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request = Request(scope)
+        key = self.key_func(request)
+        allowed, retry_after = self.bucket.consume(key)
+
+        if not allowed:
+            response = Response(
+                content="Rate limit exceeded",
+                status_code=429,
+                headers={"Retry-After": str(int(retry_after) + 1)},
+            )
+            await response(scope, receive, send)
+            return
+
+        await self.app(scope, receive, send)`}
+		/>
+
+		<p class="text-text mb-4">
+			Notice the pattern: check the scope type, extract request info, make the decision, either forward to the next middleware or return a response. This is exactly how FastAPI's existing middleware works. A developer familiar with the codebase would recognize this immediately.
+		</p>
+		<p class="text-text mb-4">
+			The middleware tests follow FastAPI's conventions — <code class="text-accent">tests/test_middleware_ratelimit.py</code> using <code class="text-accent">TestClient</code>:
+		</p>
+
+		<CodeGroup
+			title="tests/test_middleware_ratelimit.py"
+			python={`from fastapi import FastAPI
+from fastapi.middleware.ratelimit import RateLimitMiddleware
+from starlette.testclient import TestClient
+
+
+def create_app(rate: float = 10.0, capacity: int = 2) -> FastAPI:
+    app = FastAPI()
+    app.add_middleware(RateLimitMiddleware, rate=rate, capacity=capacity)
+
+    @app.get("/")
+    async def root():
+        return {"message": "ok"}
+
+    return app
+
+
+def test_allows_normal_requests():
+    client = TestClient(create_app(capacity=5))
+    response = client.get("/")
+    assert response.status_code == 200
+
+
+def test_returns_429_when_rate_limited():
+    client = TestClient(create_app(rate=0.1, capacity=1))
+    client.get("/")  # Consume the one token
+    response = client.get("/")
+    assert response.status_code == 429
+    assert "Retry-After" in response.headers
+
+
+def test_retry_after_header_is_present():
+    client = TestClient(create_app(rate=1.0, capacity=1))
+    client.get("/")
+    response = client.get("/")
+    retry = int(response.headers["Retry-After"])
+    assert retry >= 1
+
+
+def test_custom_key_function():
+    def api_key_func(request):
+        return request.headers.get("X-API-Key", "anonymous")
+
+    app = FastAPI()
+    app.add_middleware(
+        RateLimitMiddleware, rate=0.1, capacity=1, key_func=api_key_func
+    )
+
+    @app.get("/")
+    async def root():
+        return {"message": "ok"}
+
+    client = TestClient(app)
+    # Different API keys get separate buckets
+    client.get("/", headers={"X-API-Key": "key-a"})
+    response = client.get("/", headers={"X-API-Key": "key-b"})
+    assert response.status_code == 200`}
+		/>
+
+		<p class="text-text mb-6">
+			Plan 2 verification: all middleware tests pass, plus the core tests from Plan 1 still pass. GSD commits atomically.
+		</p>
+	</section>
+
+	<!-- Section 8: Plan 3 — Per-Route Config + OpenAPI -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Plan 3: Per-Route Configuration + OpenAPI</h2>
+		<p class="text-text mb-4">
+			The final feature plan adds per-route rate limit overrides and OpenAPI documentation. Remember the constraint from research: middleware runs before dependency injection. The solution is a decorator that attaches rate limit metadata to the route, which the middleware reads from the ASGI scope:
+		</p>
+
+		<CodeGroup
+			title="Per-route rate limit decorator"
+			python={`from functools import wraps
+from typing import Callable
+
+
+def rate_limit(rate: float, capacity: int) -> Callable:
+    """Override the global rate limit for a specific route.
+
+    Usage:
+        @app.get("/heavy-endpoint")
+        @rate_limit(rate=1.0, capacity=5)
+        async def heavy_operation():
+            ...
+    """
+    def decorator(func: Callable) -> Callable:
+        func._rate_limit = {"rate": rate, "capacity": capacity}
+
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            return await func(*args, **kwargs)
+        wrapper._rate_limit = func._rate_limit
+        return wrapper
+    return decorator`}
+		/>
+
+		<p class="text-text mb-4">
+			The middleware checks for route-level overrides before applying the global limit. And for OpenAPI, routes with rate limiting include a 429 response in their schema:
+		</p>
+
+		<CodeGroup
+			title="Usage example — global + per-route rate limits"
+			python={`from fastapi import FastAPI
+from fastapi.middleware.ratelimit import RateLimitMiddleware, rate_limit
+
+app = FastAPI()
+
+# Global limit: 100 requests/second, burst of 200
+app.add_middleware(RateLimitMiddleware, rate=100.0, capacity=200)
+
+
+@app.get("/")
+async def homepage():
+    """Uses the global rate limit."""
+    return {"message": "welcome"}
+
+
+@app.get(
+    "/expensive-operation",
+    responses={429: {"description": "Rate limit exceeded"}},
+)
+@rate_limit(rate=1.0, capacity=5)
+async def expensive():
+    """Stricter limit: 1 req/sec, burst of 5."""
+    return {"result": "computed"}
+
+
+@app.get("/health")
+@rate_limit(rate=1000.0, capacity=1000)
+async def health():
+    """Effectively no rate limit on health checks."""
+    return {"status": "ok"}`}
+		/>
+
+		<p class="text-text mb-6">
+			The <code class="text-accent">responses=&#123;429: ...&#125;</code> parameter tells FastAPI's OpenAPI generator to include a 429 response in the schema. Anyone reading the API docs knows which endpoints are rate-limited and what the error looks like. This follows FastAPI's existing pattern — it's how other error responses are documented throughout the codebase.
+		</p>
+	</section>
+
+	<!-- Section 9: Plan 4 — Integration & Regression -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Plan 4: The Regression Gate</h2>
+		<p class="text-text mb-4">
+			This plan doesn't write new code. It runs the full integration test suite — both your new tests <em>and</em> FastAPI's existing tests. This is the plan that doesn't exist in greenfield tutorials but is <strong class="text-heading">essential</strong> for existing codebases.
+		</p>
+
+		<CodeGroup
+			title="Plan 4 verification"
+			python={`# Run new rate limiting tests
+pytest tests/test_ratelimit_core.py tests/test_middleware_ratelimit.py -v
+# 6 + 5 = 11 passed
+
+# Run existing FastAPI test suite to verify no regressions
+pytest tests/ -x --timeout=300
+# ...
+# 1847 passed, 23 skipped in 142.31s
+
+# Verify OpenAPI schema includes 429 responses
+python -c "
+from fastapi.testclient import TestClient
+# ... (schema verification)
+print('OpenAPI schema: 429 responses documented')
+"`}
+		/>
+
+		<p class="text-text mb-4">
+			1,847 existing tests still pass. Your 11 new tests pass. The OpenAPI schema correctly documents rate-limited endpoints. <strong class="text-heading">This is the proof that you've added a feature without breaking anything</strong> — and it only exists because GSD's plan included a regression gate.
+		</p>
+		<p class="text-text mb-6">
+			In a typical AI-assisted workflow, you'd run your new tests (which pass) and declare victory. The 1,847 existing tests would run in CI thirty minutes later, and you'd discover you broke the CORS middleware interaction. Plan 4 catches that before you push.
+		</p>
+	</section>
+
+	<!-- Section 10: What's Different About Existing Codebases -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">What's Different About Existing Codebases</h2>
+		<p class="text-text mb-4">
+			Having built the same kind of feature in both a greenfield project (Tutorials 1-3) and an existing codebase (this tutorial), here's what's qualitatively different:
+		</p>
+
+		<div class="space-y-4 mb-6">
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">Research is load-bearing</p>
+				<p class="text-text-muted text-sm">In greenfield, you choose the patterns. In existing code, you discover them. The research phase found that middleware runs before DI, that existing middleware uses the pure ASGI pattern, and that tests follow a specific naming convention. Skipping research means building something that doesn't fit — which means rework or rejection in code review.</p>
+			</div>
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">Conventions are constraints, not suggestions</p>
+				<p class="text-text-muted text-sm">The rate limiter could have used <code class="text-accent text-xs">BaseHTTPMiddleware</code> — it's simpler. But existing middleware uses the ASGI pattern. Following the convention means your code is immediately readable to anyone who knows the codebase. Breaking it means your code looks foreign, even if it works.</p>
+			</div>
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">Existing tests are your safety net</p>
+				<p class="text-text-muted text-sm">In greenfield, you write all the tests. In existing code, there are already 1,847 tests that implicitly define "correct behavior." Running them after your changes is non-negotiable. GSD makes this a first-class plan, not an afterthought.</p>
+			</div>
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">Isolation before integration</p>
+				<p class="text-text-muted text-sm">Plan 1 built and tested the token bucket with zero FastAPI imports. If the algorithm had a bug, you'd find it in a 0.12-second test run — not buried under middleware wiring and ASGI plumbing. In a large codebase, isolating your new logic makes debugging dramatically faster.</p>
+			</div>
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">The discuss phase does more work</p>
+				<p class="text-text-muted text-sm">In greenfield, discuss resolves your preferences. In existing code, discuss reconciles your intent with the codebase's constraints. "Where does state live?" had a right answer dictated by the architecture, not just a preference. GSD surfaced that before planning, not during execution.</p>
+			</div>
+		</div>
+	</section>
+
+	<!-- Section 11: Key Takeaways -->
+	<section class="mb-16">
+		<h2 class="text-2xl font-semibold text-heading mb-4">Key Takeaways</h2>
+
+		<ul class="text-text space-y-3 mb-8 list-none pl-0">
+			<li class="flex items-start gap-3">
+				<span class="text-accent mt-1 shrink-0">&#9656;</span>
+				<span><strong class="text-heading">Read before you write.</strong> GSD's research phase discovers how the codebase works — its patterns, conventions, and implicit constraints. In an unfamiliar codebase, this research prevents you from building something technically correct but architecturally wrong.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-accent mt-1 shrink-0">&#9656;</span>
+				<span><strong class="text-heading">Follow the codebase's patterns, not your own.</strong> The rate limiter uses pure ASGI middleware because that's what FastAPI does. Matching conventions makes your code reviewable, maintainable, and mergeable. GSD records these as constraints during discuss.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-accent mt-1 shrink-0">&#9656;</span>
+				<span><strong class="text-heading">Isolate new logic before integrating.</strong> The token bucket was tested with zero framework dependencies. Pure logic, pure tests, zero ambiguity about what's broken when something fails. Integration comes after the foundation is proven.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-accent mt-1 shrink-0">&#9656;</span>
+				<span><strong class="text-heading">Existing tests are the contract.</strong> 1,847 existing tests define what "working" means. Your feature is only done when all of them still pass. GSD makes regression testing a first-class plan, not a CI afterthought.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-accent mt-1 shrink-0">&#9656;</span>
+				<span><strong class="text-heading">GSD scales to codebases you didn't build.</strong> The same discuss-plan-execute-verify loop works whether you wrote every line or you're seeing the code for the first time. The research phase just does more work — and that extra work is what makes the feature land cleanly.</span>
+			</li>
+		</ul>
+
+		<h2 class="text-2xl font-semibold text-heading mb-4">Where to Go from Here</h2>
+		<p class="text-text mb-4">
+			You've now used GSD across the full spectrum — from a simple CLI built from scratch to a feature in a production-grade open-source framework. The workflow is the same. The rigor is the same. What changes is how much research and existing-codebase awareness you need before planning.
+		</p>
+		<p class="text-text mb-6">
+			Try it on your own codebase. Fork a project you use, pick a feature you wish it had, and run <code class="text-accent">/gsd-new-project</code>. The research phase will teach you how the code works. The discuss phase will shape your approach to fit. The plans will keep the work clean. And the verification will prove you didn't break anything.
+		</p>
+
+		<div class="flex justify-center">
+			<a
+				href={base}
+				class="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-heading font-medium hover:bg-accent-hover transition-colors"
+			>
+				Back to all tutorials
+				<span>&rarr;</span>
+			</a>
+		</div>
+	</section>
+
+</TutorialLayout>

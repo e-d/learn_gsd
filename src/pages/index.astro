@@ -8,7 +8,10 @@ import TutorialCard from '../components/TutorialCard.astro';
 	<div class="mx-auto max-w-[1100px] px-6">
 		<Hero />
 		<section id="tutorials" class="pb-20">
-			<div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+			<p class="text-text-muted text-sm mb-6">
+				Tutorials 1–3 build progressively on the same task tracker project. Tutorial 4 is standalone — it applies GSD to an existing open-source codebase.
+			</p>
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
 				<TutorialCard
 					number={1}
 					title="Claude Code Fundamentals"
@@ -29,6 +32,13 @@ import TutorialCard from '../components/TutorialCard.astro';
 					description="Use GSD's structured workflow to safely refactor existing code with confidence."
 					href={`${import.meta.env.BASE_URL}tutorials/refactoring-with-gsd`}
 					readingTime="45 min"
+				/>
+				<TutorialCard
+					number={4}
+					title="GSD on an Existing Codebase"
+					description="Use GSD to build a feature in FastAPI — navigating unfamiliar code, following existing patterns, and proving zero regressions."
+					href={`${import.meta.env.BASE_URL}tutorials/gsd-on-existing-codebases`}
+					readingTime="60 min"
 				/>
 			</div>
 		</section>
