@@ -16,7 +16,7 @@ const base = import.meta.env.BASE_URL;
 			You know the code should be split into modules. You know the JSON file storage should be abstracted so you could swap it later. You know there should be tests. But refactoring working code is risky — especially when there are no tests to catch regressions.
 		</p>
 		<p class="text-text mb-6">
-			This is where most refactoring goes wrong. Someone starts moving functions around, breaks something subtle, spends an hour debugging, and either gives up or ships it with a "this should be fine" commit message. GSD prevents this by treating refactoring as structured work — planned, verified at every step, and reversible when something goes wrong.
+			This is where most refactoring goes wrong. Someone starts moving functions around, breaks something subtle, spends an hour debugging, and either gives up or ships it with a "this should be fine" commit message. GSD prevents this by treating refactoring as structured work — discussed, planned, verified at every step, and atomically committed so each change is independently revertable.
 		</p>
 	</section>
 
@@ -24,7 +24,7 @@ const base = import.meta.env.BASE_URL;
 	<section class="mb-16">
 		<h2 class="text-2xl font-semibold text-heading mb-4">Planning the Refactor</h2>
 		<p class="text-text mb-4">
-			Start by telling GSD what you want to accomplish:
+			Start by telling GSD what you want to accomplish. Use <code class="text-accent">/gsd-discuss-phase</code> to work through the approach before any code changes:
 		</p>
 
 		<div class="rounded-lg border border-border bg-surface p-6 mb-6">
@@ -35,28 +35,31 @@ const base = import.meta.env.BASE_URL;
 		</div>
 
 		<p class="text-text mb-4">
-			GSD decomposes this into slices, ordered by risk. Refactoring order matters — you don't extract the CLI layer before the storage layer, because the CLI depends on how data access works.
+			GSD's discuss phase works through the gray areas: should tests come before or after the extraction? What does "identical behavior" mean — same output, same exit codes, same error messages? These decisions get recorded in <code class="text-accent">.planning/STATE.md</code>.
+		</p>
+		<p class="text-text mb-4">
+			After discussion, <code class="text-accent">/gsd-plan-phase</code> creates atomic plans ordered by dependency. Refactoring order matters — you don't extract the CLI layer before the storage layer, because the CLI depends on how data access works.
 		</p>
 
 		<div class="rounded-lg border border-border bg-surface p-6 mb-6">
-			<p class="text-text-muted text-sm mb-3">GSD's refactoring roadmap:</p>
+			<p class="text-text-muted text-sm mb-3">GSD's refactoring plans:</p>
 			<div class="space-y-3">
 				<div class="flex items-start gap-3">
-					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">S01</span>
+					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">Plan 1</span>
 					<div>
 						<p class="text-heading text-sm font-medium">Add tests to the existing code</p>
 						<p class="text-text-muted text-sm">After this: test suite passes on the current single-file implementation — your safety net is in place</p>
 					</div>
 				</div>
 				<div class="flex items-start gap-3">
-					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">S02</span>
+					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">Plan 2</span>
 					<div>
 						<p class="text-heading text-sm font-medium">Extract storage module</p>
 						<p class="text-text-muted text-sm">After this: storage is behind a clean interface, all existing tests still pass</p>
 					</div>
 				</div>
 				<div class="flex items-start gap-3">
-					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">S03</span>
+					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">Plan 3</span>
 					<div>
 						<p class="text-heading text-sm font-medium">Separate business logic from CLI</p>
 						<p class="text-text-muted text-sm">After this: clean architecture — CLI is a thin shell, logic is independently testable, all tests pass</p>
@@ -66,18 +69,18 @@ const base = import.meta.env.BASE_URL;
 		</div>
 
 		<p class="text-text mb-4">
-			Notice S01 comes first: <strong class="text-heading">tests before refactoring.</strong> This is the single most important lesson in this tutorial. Without tests, you're flying blind — every change could break something you won't notice until a user reports it. With tests, every slice has an instant verification: <em>did the tests still pass?</em>
+			Notice Plan 1 comes first: <strong class="text-heading">tests before refactoring.</strong> This is the single most important lesson in this tutorial. Without tests, you're flying blind — every change could break something you won't notice until a user reports it. With tests, every plan has an instant verification: <em>did the tests still pass?</em>
 		</p>
 		<p class="text-text mb-6">
-			GSD records this decision in <code class="text-accent">.gsd/DECISIONS.md</code>: "Write tests against the existing interface first, then refactor behind them. Tests verify behavior hasn't changed — they're the contract."
+			GSD records this decision in <code class="text-accent">.planning/STATE.md</code>: "Write tests against the existing interface first, then refactor behind them. Tests verify behavior hasn't changed — they're the contract."
 		</p>
 	</section>
 
-	<!-- Section 3: Slice 1 — Tests First -->
+	<!-- Section 3: Plan 1 — Tests First -->
 	<section class="mb-16">
-		<h2 class="text-2xl font-semibold text-heading mb-4">Slice 1: Tests First</h2>
+		<h2 class="text-2xl font-semibold text-heading mb-4">Plan 1: Tests First</h2>
 		<p class="text-text mb-4">
-			The first slice writes tests against the current code without changing any implementation. These tests capture the existing behavior — they're the contract that every subsequent refactoring step must honor.
+			The first plan writes tests against the current code without changing any implementation. These tests capture the existing behavior — they're the contract that every subsequent refactoring step must honor. GSD executes this with a fresh context window that reads only the plan and the current code.
 		</p>
 
 		<CodeGroup
@@ -264,7 +267,7 @@ describe("done", () => {
 		/>
 
 		<p class="text-text mb-4">
-			GSD verifies this slice by running the test suite:
+			GSD verifies this plan by running the test suite:
 		</p>
 
 		<CodeGroup
@@ -301,18 +304,18 @@ describe("done", () => {
 		/>
 
 		<p class="text-text mb-6">
-			Eight tests, all green. We haven't changed a single line of implementation code. These tests are the contract — every future slice must keep them passing. GSD records the baseline and moves on.
+			Eight tests, all green. We haven't changed a single line of implementation code. These tests are the contract — every future plan must keep them passing. GSD creates an atomic commit for the test suite and moves on.
 		</p>
 	</section>
 
-	<!-- Section 4: Slice 2 — Extract Storage -->
+	<!-- Section 4: Plan 2 — Extract Storage -->
 	<section class="mb-16">
-		<h2 class="text-2xl font-semibold text-heading mb-4">Slice 2: Extract the Storage Layer</h2>
+		<h2 class="text-2xl font-semibold text-heading mb-4">Plan 2: Extract the Storage Layer</h2>
 		<p class="text-text mb-4">
-			Now the refactoring begins. The goal: move all JSON file I/O into a dedicated storage module with a clean interface. The main file should never touch the filesystem directly.
+			Now the refactoring begins. This plan runs with a fresh context — it reads the plan file and the current code (which now includes the tests from Plan 1). The goal: move all JSON file I/O into a dedicated storage module with a clean interface. The main file should never touch the filesystem directly.
 		</p>
 		<p class="text-text mb-4">
-			This is where GSD's slice structure matters. The task plan specifies: extract storage, update imports in the main file, <strong class="text-heading">run the existing tests</strong>. The tests don't care where data is stored — they test through the CLI interface. If the tests still pass, the refactoring preserved behavior.
+			The plan specifies: extract storage, update imports in the main file, <strong class="text-heading">run the existing tests</strong>. The tests don't care where data is stored — they test through the CLI interface. If the tests still pass, the refactoring preserved behavior.
 		</p>
 
 		<CodeGroup
@@ -615,7 +618,7 @@ program.parse();`}
 		/>
 
 		<p class="text-text mb-4">
-			Now the critical moment — run the tests from Slice 1 against the refactored code:
+			Now the critical moment — run the tests from Plan 1 against the refactored code:
 		</p>
 
 		<CodeGroup
@@ -631,7 +634,7 @@ program.parse();`}
 # test_task_tracker.py::TestDone::test_mark_done PASSED
 # test_task_tracker.py::TestDone::test_done_not_found PASSED
 
-# 8 passed in 0.31s ✅ All green — storage extraction preserved behavior`}
+# 8 passed in 0.31s — storage extraction preserved behavior`}
 			typescript={`npx vitest run
 
 # ✓ task_tracker.test.ts (7)
@@ -648,22 +651,19 @@ program.parse();`}
 #     ✓ exits with error for missing task
 
 # Test Files  1 passed (1)
-# Tests  8 passed (8) ✅ All green — storage extraction preserved behavior`}
+# Tests  8 passed (8) — storage extraction preserved behavior`}
 		/>
 
 		<p class="text-text mb-4">
-			All eight tests pass. The storage is now behind a clean interface, but the behavior is identical. If we wanted to swap JSON for SQLite later, we'd only change <code class="text-accent">storage.py</code> (or <code class="text-accent">storage.ts</code>) — nothing else.
-		</p>
-		<p class="text-text mb-6">
-			GSD's reassessment step confirms the extraction went cleanly and the Slice 3 plan is still valid.
+			All eight tests pass. The storage is now behind a clean interface, but the behavior is identical. If we wanted to swap JSON for SQLite later, we'd only change <code class="text-accent">storage.py</code> (or <code class="text-accent">storage.ts</code>) — nothing else. GSD commits this atomically — one clean, revertable change.
 		</p>
 	</section>
 
-	<!-- Section 5: Slice 3 — Separate Business Logic -->
+	<!-- Section 5: Plan 3 — Separate Business Logic -->
 	<section class="mb-16">
-		<h2 class="text-2xl font-semibold text-heading mb-4">Slice 3: Separate Business Logic from CLI</h2>
+		<h2 class="text-2xl font-semibold text-heading mb-4">Plan 3: Separate Business Logic from CLI</h2>
 		<p class="text-text mb-4">
-			The final slice extracts the core logic — adding tasks, marking them done, filtering — into a service module. The CLI file becomes a thin shell that parses arguments and calls the service. This makes the business logic testable without invoking the CLI.
+			The final plan extracts the core logic — adding tasks, marking them done, filtering — into a service module. Again, this runs with a fresh context that reads the plan and the current code (now including the extracted storage module). The CLI file becomes a thin shell that parses arguments and calls the service.
 		</p>
 
 		<CodeGroup
@@ -975,13 +975,16 @@ program.parse();`}
 ├── task_tracker.py (or .ts) ← thin CLI shell
 ├── test_task_tracker.py (or .test.ts) ← behavioral tests
 ├── tasks.json
-└── .gsd/
-    ├── DECISIONS.md        ← "tests first, then refactor"
-    └── milestones/M001/    ← full execution history</code></pre>
+└── .planning/
+    ├── PROJECT.md          ← project description
+    ├── REQUIREMENTS.md     ← what it needs to do
+    ├── ROADMAP.md          ← phases of work
+    ├── STATE.md            ← decisions and progress
+    └── 01-*-PLAN.md        ← execution plans</code></pre>
 		</div>
 
 		<p class="text-text mb-6">
-			Three files, clear responsibilities. The CLI parses arguments and formats output. The service contains business logic. The storage handles persistence. Each can change independently. Each is testable in isolation.
+			Three source files, clear responsibilities. The CLI parses arguments and formats output. The service contains business logic. The storage handles persistence. Each can change independently. Each is testable in isolation. And each extraction was committed atomically — if any step had gone wrong, you'd revert just that commit.
 		</p>
 	</section>
 
@@ -998,16 +1001,20 @@ program.parse();`}
 				<p class="text-text-muted text-sm">The tests were written against the working code before any refactoring started. They captured the real behavior — not the intended behavior. That distinction matters when you're changing how the code is organized but not what it does.</p>
 			</div>
 			<div class="rounded-lg border border-border bg-surface p-5">
-				<p class="text-heading font-medium mb-2">One structural change per slice</p>
-				<p class="text-text-muted text-sm">Slice 2 extracted storage. Slice 3 extracted business logic. We never did both at once. When tests fail after a single change, you know exactly what broke. When tests fail after two simultaneous changes, you're debugging a combinatorial explosion.</p>
+				<p class="text-heading font-medium mb-2">One structural change per plan</p>
+				<p class="text-text-muted text-sm">Plan 2 extracted storage. Plan 3 extracted business logic. We never did both at once. When tests fail after a single change, you know exactly what broke. When tests fail after two simultaneous changes, you're debugging a combinatorial explosion.</p>
+			</div>
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">Fresh context prevented confusion</p>
+				<p class="text-text-muted text-sm">Each plan ran with a clean 200k-token context. Plan 3 didn't inherit stale assumptions from Plan 2's execution — it read the current code fresh. No "but I thought we changed that" confusion from accumulated context.</p>
 			</div>
 			<div class="rounded-lg border border-border bg-surface p-5">
 				<p class="text-heading font-medium mb-2">Same tests, different structure</p>
-				<p class="text-text-muted text-sm">The test suite didn't change between slices. It tested through the CLI interface, which means it verified behavior regardless of how the internals were organized. If the tests pass, the refactoring preserved the contract.</p>
+				<p class="text-text-muted text-sm">The test suite didn't change between plans. It tested through the CLI interface, which means it verified behavior regardless of how the internals were organized. If the tests pass, the refactoring preserved the contract.</p>
 			</div>
 			<div class="rounded-lg border border-border bg-surface p-5">
-				<p class="text-heading font-medium mb-2">Reassessment caught nothing — and that's the point</p>
-				<p class="text-text-muted text-sm">After each slice, GSD reassessed the roadmap. In this case, nothing changed — the plan was still valid. But if Slice 2 had revealed that the storage interface needed a different shape, GSD would have replanned Slice 3 before we built on a shaky foundation.</p>
+				<p class="text-heading font-medium mb-2">Atomic commits for clean rollback</p>
+				<p class="text-text-muted text-sm">Each plan produced one commit. If Plan 3 had broken something subtle, we'd revert that single commit — the storage extraction from Plan 2 would still be intact. No "revert everything and start over."</p>
 			</div>
 		</div>
 
@@ -1027,11 +1034,11 @@ program.parse();`}
 			</li>
 			<li class="flex items-start gap-3">
 				<span class="text-accent mt-1 shrink-0">&#9656;</span>
-				<span><strong class="text-heading">One change per slice.</strong> Extract one concern at a time. Run the tests between each extraction. Small steps compound into safe transformations.</span>
+				<span><strong class="text-heading">One change per plan.</strong> Extract one concern at a time. Run the tests between each extraction. Small steps compound into safe transformations.</span>
 			</li>
 			<li class="flex items-start gap-3">
 				<span class="text-accent mt-1 shrink-0">&#9656;</span>
-				<span><strong class="text-heading">Refactoring is structured work.</strong> It feels like "just moving code around," but it's the most error-prone kind of change. GSD treats it with the same rigor as new features — planned, sliced, verified.</span>
+				<span><strong class="text-heading">Refactoring is structured work.</strong> It feels like "just moving code around," but it's the most error-prone kind of change. GSD treats it with the same rigor as new features — discussed, planned, verified.</span>
 			</li>
 			<li class="flex items-start gap-3">
 				<span class="text-accent mt-1 shrink-0">&#9656;</span>
@@ -1051,7 +1058,7 @@ program.parse();`}
 			<a href={`${base}tutorials/claude-code-fundamentals`} class="text-accent hover:text-accent-hover transition-colors underline">Tutorial 1</a> taught you to work with Claude Code. <a href={`${base}tutorials/building-features-with-gsd`} class="text-accent hover:text-accent-hover transition-colors underline">Tutorial 2</a> taught you to plan and execute features with GSD. This tutorial taught you to refactor safely — the skill that separates code that grows from code that rots.
 		</p>
 		<p class="text-text mb-6">
-			The patterns scale. The same plan-execute-verify loop works for database migrations, API redesigns, monolith-to-microservice splits, and framework upgrades. The tools are the same. The discipline is the same. Start with tests, change one thing at a time, verify at every step.
+			The patterns scale. The same discuss-plan-execute-verify loop works for database migrations, API redesigns, monolith-to-microservice splits, and framework upgrades. The tools are the same. The discipline is the same. Start with tests, change one thing at a time, verify at every step.
 		</p>
 
 		<div class="flex justify-center">

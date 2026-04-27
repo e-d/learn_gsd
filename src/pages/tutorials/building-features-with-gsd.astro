@@ -16,12 +16,14 @@ const base = import.meta.env.BASE_URL;
 			But what happens when the feature is bigger? Say you want to add priorities, due dates, and filtered views to the task tracker. That's three interconnected changes to the data model, three new CLI commands, modifications to existing commands, and new display logic. If you just start prompting, you'll end up backtracking — "wait, I need to change the add command too" — or building something that doesn't quite fit together.
 		</p>
 		<p class="text-text mb-4">
-			This is where <strong class="text-heading">GSD</strong> comes in. GSD (Get Shit Done) is a structured workflow that sits on top of Claude Code. It breaks work into a loop:
+			This is where <strong class="text-heading">GSD</strong> comes in. GSD (Get Shit Done) is a plugin for Claude Code that adds a structured workflow on top of your normal coding sessions. It breaks work into a repeating cycle:
 		</p>
 		<ol class="text-text mb-6 list-decimal list-inside space-y-2 pl-2">
-			<li><strong class="text-heading">Plan</strong> — define what you're building, break it into slices, break slices into tasks</li>
-			<li><strong class="text-heading">Execute</strong> — work through each task with Claude Code, one at a time</li>
+			<li><strong class="text-heading">Discuss</strong> — establish implementation preferences and resolve gray areas</li>
+			<li><strong class="text-heading">Plan</strong> — research approaches and create atomic task plans</li>
+			<li><strong class="text-heading">Execute</strong> — work through each plan, each with a fresh 200k context window</li>
 			<li><strong class="text-heading">Verify</strong> — prove the work is done before moving on</li>
+			<li><strong class="text-heading">Ship</strong> — commit and move to the next phase</li>
 		</ol>
 		<p class="text-text mb-6">
 			It sounds like overhead. It's actually the opposite — the upfront planning prevents the rework that eats real time. In this tutorial, you'll use GSD to add priorities and due dates to the task tracker from Tutorial 1, and you'll see how the structure keeps the work clean even when the feature touches multiple parts of the code.
@@ -32,34 +34,42 @@ const base = import.meta.env.BASE_URL;
 	<section class="mb-16">
 		<h2 class="text-2xl font-semibold text-heading mb-4">Setting Up GSD</h2>
 		<p class="text-text mb-4">
-			GSD is available as a plugin for Claude Code. If you haven't installed it yet, add it globally:
+			GSD installs as a Claude Code plugin. Run the installer and follow the prompts:
 		</p>
 
 		<CodeGroup
 			title="Install GSD"
-			python={`# Install the GSD plugin
-npm install -g gsd-pi
+			python={`# Install the GSD plugin for Claude Code
+npx get-shit-done-cc@latest
+
+# The installer will ask you to choose:
+#   Runtime: Claude Code
+#   Scope: global (recommended) or local (project-only)
 
 # Navigate to your task tracker project from Tutorial 1
 cd task-tracker
 
-# Start Claude Code with GSD
+# Start Claude Code — GSD commands are now available
 claude`}
-			typescript={`# Install the GSD plugin
-npm install -g gsd-pi
+			typescript={`# Install the GSD plugin for Claude Code
+npx get-shit-done-cc@latest
+
+# The installer will ask you to choose:
+#   Runtime: Claude Code
+#   Scope: global (recommended) or local (project-only)
 
 # Navigate to your task tracker project from Tutorial 1
 cd task-tracker
 
-# Start Claude Code with GSD
+# Start Claude Code — GSD commands are now available
 claude`}
 		/>
 
 		<p class="text-text mb-4">
-			Once Claude Code launches, type <code class="text-accent">/gsd</code> to activate the GSD wizard. It will walk you through initializing GSD for your project — creating a <code class="text-accent">.gsd/</code> directory to store plans, decisions, and progress tracking.
+			Once Claude Code launches, type <code class="text-accent">/gsd-new-project</code> to initialize GSD for your project. It will ask you questions about what you're building, research the codebase, and set up a <code class="text-accent">.planning/</code> directory to store plans, decisions, and progress.
 		</p>
 		<p class="text-text mb-6">
-			GSD stores everything as plain files in your project. No databases, no cloud services, no accounts. The <code class="text-accent">.gsd/</code> directory contains your project state, milestone plans, and execution history — all version-controllable and human-readable.
+			GSD stores everything as plain files in your project. No databases, no cloud services, no accounts. The <code class="text-accent">.planning/</code> directory contains your project state, phase plans, and execution history — all version-controllable and human-readable.
 		</p>
 
 		<div class="rounded-lg border border-border bg-surface p-6 mb-6">
@@ -67,12 +77,12 @@ claude`}
 			<pre class="text-text font-mono text-sm leading-relaxed"><code>task-tracker/
 ├── task_tracker.py  (or .ts)
 ├── tasks.json
-└── .gsd/
-    ├── PROJECT.md       ← what the project is
-    ├── REQUIREMENTS.md  ← what it needs to do
-    ├── DECISIONS.md     ← choices made and why
-    ├── STATE.md         ← current progress
-    └── milestones/      ← planned work</code></pre>
+└── .planning/
+    ├── PROJECT.md        ← what the project is
+    ├── REQUIREMENTS.md   ← what it needs to do
+    ├── ROADMAP.md        ← phases of work
+    ├── STATE.md          ← decisions and current progress
+    └── research/         ← ecosystem findings</code></pre>
 		</div>
 
 		<p class="text-text mb-6">
@@ -84,7 +94,7 @@ claude`}
 	<section class="mb-16">
 		<h2 class="text-2xl font-semibold text-heading mb-4">Planning the Feature</h2>
 		<p class="text-text mb-4">
-			Let's plan the feature we're adding: <strong class="text-heading">priorities and due dates</strong> for the task tracker. Start by telling GSD what you want to build:
+			Let's plan the feature we're adding: <strong class="text-heading">priorities and due dates</strong> for the task tracker. Start by telling GSD what you want to build. The <code class="text-accent">/gsd-discuss-phase</code> command kicks off a conversation where GSD asks clarifying questions before any code is written:
 		</p>
 
 		<div class="rounded-lg border border-border bg-surface p-6 mb-6">
@@ -95,28 +105,31 @@ claude`}
 		</div>
 
 		<p class="text-text mb-4">
-			GSD breaks this into a <strong class="text-heading">milestone</strong> (the overall feature) containing <strong class="text-heading">slices</strong> (independently demoable vertical increments). Each slice produces something you can test. Here's roughly how GSD would decompose this:
+			GSD's discuss phase resolves gray areas — things like: what's the default priority? Are due dates optional? What does "overdue" look like in the output? These decisions get recorded in <code class="text-accent">.planning/STATE.md</code> so you don't revisit them during execution.
+		</p>
+		<p class="text-text mb-4">
+			After discussion, <code class="text-accent">/gsd-plan-phase</code> researches approaches and creates <strong class="text-heading">atomic plans</strong> — small, independent units of work that each get their own fresh context window during execution. Here's roughly how GSD would decompose this feature:
 		</p>
 
 		<div class="rounded-lg border border-border bg-surface p-6 mb-6">
-			<p class="text-text-muted text-sm mb-3">GSD's roadmap for this feature:</p>
+			<p class="text-text-muted text-sm mb-3">GSD's plans for this feature:</p>
 			<div class="space-y-3">
 				<div class="flex items-start gap-3">
-					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">S01</span>
+					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">Plan 1</span>
 					<div>
 						<p class="text-heading text-sm font-medium">Add priority field to data model + add command</p>
 						<p class="text-text-muted text-sm">After this: tasks have a priority, <code class="text-accent text-xs">add</code> accepts <code class="text-accent text-xs">--priority</code>, <code class="text-accent text-xs">list</code> shows it</p>
 					</div>
 				</div>
 				<div class="flex items-start gap-3">
-					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">S02</span>
+					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">Plan 2</span>
 					<div>
 						<p class="text-heading text-sm font-medium">Add due date field + overdue detection</p>
 						<p class="text-text-muted text-sm">After this: tasks have optional due dates, <code class="text-accent text-xs">list</code> highlights overdue tasks</p>
 					</div>
 				</div>
 				<div class="flex items-start gap-3">
-					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">S03</span>
+					<span class="text-accent font-mono text-sm shrink-0 mt-0.5">Plan 3</span>
 					<div>
 						<p class="text-heading text-sm font-medium">Add filter commands</p>
 						<p class="text-text-muted text-sm">After this: users can filter by priority and list overdue tasks</p>
@@ -126,26 +139,26 @@ claude`}
 		</div>
 
 		<p class="text-text mb-4">
-			Notice the ordering. GSD puts slices in <strong class="text-heading">risk order</strong> — the riskiest or most foundational work first. S01 modifies the data model, which everything else depends on. If that design is wrong, we want to find out before building filtering on top of it.
+			Notice the ordering. GSD puts foundational work first — Plan 1 modifies the data model, which everything else depends on. If that design is wrong, we want to find out before building filtering on top of it.
 		</p>
 		<p class="text-text mb-6">
-			Each slice gets further broken into <strong class="text-heading">tasks</strong> — units of work small enough to complete in a single Claude Code session. GSD tracks these at <code class="text-accent">.gsd/milestones/M001/slices/S01/S01-PLAN.md</code>. You don't need to create these files manually — GSD does it from the planning conversation.
+			Each plan is written to a file like <code class="text-accent">.planning/01-1-PLAN.md</code> (phase 1, plan 1). The plan includes exactly what files to touch, what the expected output looks like, and how to verify the work. You don't write these files manually — GSD creates them from the planning conversation.
 		</p>
 	</section>
 
-	<!-- Section 4: Executing: Slice by Slice -->
+	<!-- Section 4: Executing: Plan by Plan -->
 	<section class="mb-16">
-		<h2 class="text-2xl font-semibold text-heading mb-4">Executing: Slice by Slice</h2>
+		<h2 class="text-2xl font-semibold text-heading mb-4">Executing: Plan by Plan</h2>
 		<p class="text-text mb-4">
-			With the plan in place, GSD switches to execution mode. You can run <code class="text-accent">/gsd auto</code> to let GSD work through the tasks automatically, or step through them manually. Either way, the loop is the same: pick up the next task, execute it, verify it, record the result.
+			With the plans in place, <code class="text-accent">/gsd-execute-phase</code> starts execution. GSD groups independent plans into <strong class="text-heading">waves</strong> and can run them in parallel. Each plan gets a fresh 200k-token context window — no accumulated confusion from prior work. Plans that depend on each other run sequentially.
 		</p>
 		<p class="text-text mb-4">
-			Let's walk through <strong class="text-heading">Slice 1</strong> manually to see the mechanics.
+			Let's walk through <strong class="text-heading">Plan 1</strong> to see the mechanics.
 		</p>
 
-		<h3 class="text-lg font-semibold text-heading mb-3 mt-8">Task 1: Update the data model</h3>
+		<h3 class="text-lg font-semibold text-heading mb-3 mt-8">Plan 1: Update the data model</h3>
 		<p class="text-text mb-4">
-			The first task modifies the task data structure to include a priority field. GSD tells Claude Code exactly what to do — the task plan specifies the files to touch, the expected output, and the verification criteria.
+			The first plan modifies the task data structure to include a priority field. GSD tells Claude Code exactly what to do — the plan specifies the files to touch, the expected output, and the verification criteria.
 		</p>
 
 		<CodeGroup
@@ -361,7 +374,7 @@ program.parse();`}
 		/>
 
 		<p class="text-text mb-4">
-			After Claude Code makes the changes, GSD verifies the task. It doesn't just check that the code compiles — it runs the actual commands and checks the output matches expectations:
+			After Claude Code makes the changes, GSD verifies the plan. It doesn't just check that the code compiles — it runs the actual commands and checks the output matches expectations:
 		</p>
 
 		<CodeGroup
@@ -393,12 +406,12 @@ npx tsx task_tracker.ts list
 		/>
 
 		<p class="text-text mb-4">
-			The task passes verification. GSD records the evidence and moves to the next task. This is the core loop: <strong class="text-heading">plan → execute → verify → advance</strong>.
+			The plan passes verification. GSD creates an atomic commit for the completed work and moves to the next plan. Each plan gets its own commit — if something goes wrong later, you can bisect or revert individual changes cleanly.
 		</p>
 
-		<h3 class="text-lg font-semibold text-heading mb-3 mt-8">The reassessment step</h3>
+		<h3 class="text-lg font-semibold text-heading mb-3 mt-8">Fresh context, every time</h3>
 		<p class="text-text mb-6">
-			Here's something that distinguishes GSD from a simple task list. After each slice completes, GSD <strong class="text-heading">reassesses the roadmap</strong>. It asks: did we learn anything that changes the remaining plan? Maybe adding priorities was simpler than expected, so the filtering slice can be more ambitious. Or maybe we discovered that the JSON storage format needs restructuring, and that affects the next slice. The plan is a living document — not a contract you wrote before you understood the problem.
+			Here's something important about how GSD executes. Each plan runs with a <strong class="text-heading">fresh 200k-token context window</strong>. Plan 2 doesn't inherit the accumulated conversation from Plan 1 — it starts clean, reads only the plan file and the current code. This prevents the "context rot" problem where Claude Code gradually loses track of what's happening after hundreds of exchanges. The plan file carries the intent; the code carries the state. No stale context to confuse things.
 		</p>
 	</section>
 
@@ -406,7 +419,7 @@ npx tsx task_tracker.ts list
 	<section class="mb-16">
 		<h2 class="text-2xl font-semibold text-heading mb-4">Adding Due Dates and Filters</h2>
 		<p class="text-text mb-4">
-			Slice 2 adds due dates. This follows the same loop, but now we're building on the foundation from Slice 1. GSD tracks the dependency — it knows due dates build on the priority-enhanced data model and won't start Slice 2 until Slice 1's verification passes.
+			Plans 2 and 3 add due dates and filtering. They follow the same loop — each gets a fresh context, executes against the current code (which now includes the priority changes from Plan 1), and verifies independently.
 		</p>
 
 		<CodeGroup
@@ -715,7 +728,7 @@ npx tsx task_tracker.ts list --overdue
 		/>
 
 		<p class="text-text mb-6">
-			Each of these was a separate GSD task, verified independently. The data model change was verified before the filter logic was written on top of it. That's why the slicing matters — problems surface early, when they're cheap to fix.
+			Each plan was executed with a fresh context, verified independently, and committed atomically. The data model change was verified before the filter logic was written on top of it. That's why the planning matters — problems surface early, when they're cheap to fix.
 		</p>
 	</section>
 
@@ -729,24 +742,28 @@ npx tsx task_tracker.ts list --overdue
 		<div class="space-y-4 mb-6">
 			<div class="rounded-lg border border-border bg-surface p-5">
 				<p class="text-heading font-medium mb-2">No backtracking</p>
-				<p class="text-text-muted text-sm">Because we planned the data model changes before the filter logic, we didn't have to refactor the add command after discovering the filter needed a field that didn't exist. The plan caught the dependency before execution hit it.</p>
+				<p class="text-text-muted text-sm">Because we planned the data model changes before the filter logic, we didn't have to refactor the add command after discovering the filter needed a field that didn't exist. The discuss phase caught the dependency before execution hit it.</p>
 			</div>
 			<div class="rounded-lg border border-border bg-surface p-5">
-				<p class="text-heading font-medium mb-2">Verified at every step</p>
-				<p class="text-text-muted text-sm">Each task was tested before moving on. If the priority field had been stored wrong, we'd have caught it in Slice 1 — not after building three slices of filtering logic on a broken foundation.</p>
+				<p class="text-heading font-medium mb-2">Fresh context per plan</p>
+				<p class="text-text-muted text-sm">Each plan ran with a clean 200k-token context. No accumulated confusion from long conversations. The plan file carried the intent, the code carried the state. Claude Code worked at full capacity on every task.</p>
+			</div>
+			<div class="rounded-lg border border-border bg-surface p-5">
+				<p class="text-heading font-medium mb-2">Atomic, revertable commits</p>
+				<p class="text-text-muted text-sm">Each completed plan got its own git commit. If the filter logic had introduced a bug, you could revert just that commit without losing the priority and due date work. Try doing that with a single long prompting session.</p>
 			</div>
 			<div class="rounded-lg border border-border bg-surface p-5">
 				<p class="text-heading font-medium mb-2">Decision trail</p>
-				<p class="text-text-muted text-sm">GSD recorded why we chose <code class="text-accent text-xs">!!!</code> markers instead of color codes, why due dates are optional, why we filter on the <code class="text-accent text-xs">list</code> command instead of adding separate commands. These live in <code class="text-accent text-xs">.gsd/DECISIONS.md</code> for anyone who works on this code next.</p>
+				<p class="text-text-muted text-sm">GSD recorded why we chose <code class="text-accent text-xs">!!!</code> markers instead of color codes, why due dates are optional, why we filter on the <code class="text-accent text-xs">list</code> command instead of adding separate commands. These live in <code class="text-accent text-xs">.planning/STATE.md</code> for anyone who works on this code next.</p>
 			</div>
 			<div class="rounded-lg border border-border bg-surface p-5">
 				<p class="text-heading font-medium mb-2">Resumable</p>
-				<p class="text-text-muted text-sm">If you'd closed your laptop after Slice 1, GSD's state file would tell the next session exactly where you left off, what was verified, and what's next. No lost context, no "wait, what was I doing?"</p>
+				<p class="text-text-muted text-sm">If you'd closed your laptop after Plan 1, GSD's state files would tell the next session exactly where you left off, what was verified, and what's next. No lost context, no "wait, what was I doing?"</p>
 			</div>
 		</div>
 
 		<p class="text-text mb-6">
-			For a small feature like this, the overhead is modest — maybe 5 minutes of planning. For a larger feature (authentication, API integration, database migrations), the planning time pays for itself many times over in avoided rework and missed edge cases.
+			For a small feature like this, the overhead is modest — maybe 5 minutes of discussion and planning. For a larger feature (authentication, API integration, database migrations), the planning time pays for itself many times over in avoided rework and missed edge cases.
 		</p>
 	</section>
 
@@ -757,29 +774,29 @@ npx tsx task_tracker.ts list --overdue
 		<ul class="text-text space-y-3 mb-8 list-none pl-0">
 			<li class="flex items-start gap-3">
 				<span class="text-accent mt-1 shrink-0">&#9656;</span>
-				<span><strong class="text-heading">Plan before you prompt.</strong> Five minutes of upfront planning prevents thirty minutes of backtracking. GSD's milestone → slice → task hierarchy makes this lightweight, not ceremonial.</span>
+				<span><strong class="text-heading">Discuss before you plan, plan before you execute.</strong> Five minutes of upfront discussion prevents thirty minutes of backtracking. GSD's discuss → plan → execute → verify cycle makes this lightweight, not ceremonial.</span>
 			</li>
 			<li class="flex items-start gap-3">
 				<span class="text-accent mt-1 shrink-0">&#9656;</span>
-				<span><strong class="text-heading">Verify at every boundary.</strong> Don't build filtering on an untested data model. GSD enforces verification between tasks — problems are caught early, when they're cheap to fix.</span>
+				<span><strong class="text-heading">Fresh context beats long conversations.</strong> Each plan gets a clean 200k-token window. The plan file carries intent, the code carries state. No context rot, no accumulated confusion.</span>
 			</li>
 			<li class="flex items-start gap-3">
 				<span class="text-accent mt-1 shrink-0">&#9656;</span>
-				<span><strong class="text-heading">Slices are demoable increments.</strong> Each slice produces something testable. If you stop after Slice 1, you still have a working task tracker with priorities — just without filters.</span>
+				<span><strong class="text-heading">Atomic commits for atomic plans.</strong> Each plan produces a single, revertable commit. If something goes wrong, you roll back one change — not your entire session.</span>
 			</li>
 			<li class="flex items-start gap-3">
 				<span class="text-accent mt-1 shrink-0">&#9656;</span>
-				<span><strong class="text-heading">The plan adapts.</strong> GSD reassesses the roadmap after each slice. Plans are useful because they force you to think ahead — not because they predict the future perfectly.</span>
+				<span><strong class="text-heading">Verify at every boundary.</strong> Don't build filtering on an untested data model. GSD enforces verification between plans — problems are caught early, when they're cheap to fix.</span>
 			</li>
 			<li class="flex items-start gap-3">
 				<span class="text-accent mt-1 shrink-0">&#9656;</span>
-				<span><strong class="text-heading">Decisions are recorded, not remembered.</strong> When future-you opens this codebase, <code class="text-accent">.gsd/DECISIONS.md</code> explains the why. No archeology required.</span>
+				<span><strong class="text-heading">Decisions are recorded, not remembered.</strong> When future-you opens this codebase, <code class="text-accent">.planning/STATE.md</code> explains the why. No archeology required.</span>
 			</li>
 		</ul>
 
 		<h2 class="text-2xl font-semibold text-heading mb-4">Next Steps</h2>
 		<p class="text-text mb-4">
-			You've used GSD to plan and execute a multi-slice feature on the task tracker. The workflow — plan, execute, verify, reassess — scales from CLI tools to full-stack applications.
+			You've used GSD to plan and execute a multi-plan feature on the task tracker. The workflow — discuss, plan, execute, verify, ship — scales from CLI tools to full-stack applications.
 		</p>
 		<p class="text-text mb-6">
 			But what about existing code? In <a href={`${base}tutorials/refactoring-with-gsd`} class="text-accent hover:text-accent-hover transition-colors underline">Tutorial 3: Refactoring with GSD</a>, you'll take this same task tracker and refactor it — extracting modules, improving the storage layer, and adding tests. You'll see how GSD handles changes that touch everything without breaking anything.
