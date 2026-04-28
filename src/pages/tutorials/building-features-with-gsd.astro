@@ -802,12 +802,19 @@ npx tsx task_tracker.ts list --overdue
 			But what about existing code? In <a href={`${base}tutorials/refactoring-with-gsd`} class="text-accent hover:text-accent-hover transition-colors underline">Tutorial 3: Refactoring with GSD</a>, you'll take this same task tracker and refactor it — extracting modules, improving the storage layer, and adding tests. You'll see how GSD handles changes that touch everything without breaking anything.
 		</p>
 
-		<div class="flex justify-center">
+		<div class="flex justify-between items-center">
+			<a
+				href={`${base}tutorials/claude-code-fundamentals`}
+				class="inline-flex items-center gap-2 rounded-lg border border-border px-6 py-3 text-text font-medium hover:bg-surface transition-colors"
+			>
+				<span>&larr;</span>
+				Tutorial 1: Fundamentals
+			</a>
 			<a
 				href={`${base}tutorials/refactoring-with-gsd`}
 				class="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-heading font-medium hover:bg-accent-hover transition-colors"
 			>
-				Continue to Tutorial 3
+				Tutorial 3: Refactoring
 				<span>&rarr;</span>
 			</a>
 		</div>
