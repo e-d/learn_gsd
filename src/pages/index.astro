@@ -42,5 +42,48 @@ import TutorialCard from '../components/TutorialCard.astro';
 				/>
 			</div>
 		</section>
+
+		<section class="pb-20">
+			<h2 class="text-heading text-2xl font-bold tracking-tight mb-2">Quick References</h2>
+			<p class="text-text-muted text-sm mb-6">
+				Printable cheat sheets to keep next to your terminal.
+			</p>
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+				<a href={`${import.meta.env.BASE_URL}gsd-cheat-sheet.html`} class="group block rounded-lg border border-border bg-surface p-6 transition-all hover:border-accent/50 hover:shadow-[0_0_20px_rgba(99,102,241,0.08)]">
+					<div class="flex items-center gap-3 mb-3">
+						<span class="text-accent text-sm font-medium">GSD</span>
+					</div>
+					<h3 class="text-heading text-lg font-semibold group-hover:text-accent transition-colors">
+						GSD Command Cheat Sheet
+					</h3>
+					<p class="text-text-muted text-sm mt-2 leading-relaxed">
+						Every GSD slash command grouped by what you're trying to do — core loop, phases, quality gates, debug, and more.
+					</p>
+					<span class="inline-flex items-center gap-1 text-accent text-sm mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+						View cheat sheet
+						<svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="translate-x-0 group-hover:translate-x-1 transition-transform">
+							<path d="M6 12L10 8L6 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+						</svg>
+					</span>
+				</a>
+				<a href="https://cc.storyfox.cz/" target="_blank" rel="noopener noreferrer" class="group block rounded-lg border border-border bg-surface p-6 transition-all hover:border-accent/50 hover:shadow-[0_0_20px_rgba(99,102,241,0.08)]">
+					<div class="flex items-center gap-3 mb-3">
+						<span class="text-accent text-sm font-medium">Claude Code</span>
+					</div>
+					<h3 class="text-heading text-lg font-semibold group-hover:text-accent transition-colors">
+						Claude Code Cheat Sheet
+					</h3>
+					<p class="text-text-muted text-sm mt-2 leading-relaxed">
+						Commands, keyboard shortcuts, and tips for Claude Code — the AI coding agent that powers GSD.
+					</p>
+					<span class="inline-flex items-center gap-1 text-accent text-sm mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+						View cheat sheet
+						<svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="translate-x-0 group-hover:translate-x-1 transition-transform">
+							<path d="M6 12L10 8L6 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+						</svg>
+					</span>
+				</a>
+			</div>
+		</section>
 	</div>
 </BaseLayout>

@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GSD Cheat Sheet</title>
+<style>
+  :root {
+    --bg: #fafaf7;
+    --fg: #1c1c1c;
+    --muted: #6b6b6b;
+    --rule: #e3e1da;
+    --accent: #b4531a;
+    --code-bg: #f1efe8;
+    --new: #0a7a3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14140f;
+      --fg: #ece9df;
+      --muted: #9a978c;
+      --rule: #2c2b25;
+      --accent: #e88a52;
+      --code-bg: #1f1e18;
+      --new: #5fb380;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+  header {
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 16px;
+    margin-bottom: 28px;
+  }
+  h1 {
+    font-size: 30px;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  .meta {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .meta .sep { margin: 0 8px; color: var(--rule); }
+  .lede {
+    margin: 14px 0 0;
+    color: var(--muted);
+    font-size: 14px;
+    max-width: 70ch;
+  }
+  section {
+    margin: 28px 0 0;
+    page-break-inside: avoid;
+  }
+  h2 {
+    font-size: 18px;
+    margin: 0 0 4px;
+    letter-spacing: -0.005em;
+  }
+  h2 .h-emoji { margin-right: 6px; }
+  h3 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 18px 0 6px;
+    font-weight: 600;
+  }
+  .blurb {
+    color: var(--muted);
+    font-size: 13px;
+    margin: 0 0 10px;
+  }
+  dl.cmds {
+    display: grid;
+    grid-template-columns: minmax(190px, max-content) 1fr;
+    gap: 4px 18px;
+    margin: 0;
+  }
+  dl.cmds dt {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13px;
+    color: var(--accent);
+    background: var(--code-bg);
+    padding: 2px 7px;
+    border-radius: 4px;
+    align-self: start;
+    white-space: nowrap;
+  }
+  dl.cmds dd {
+    margin: 0;
+    padding: 2px 0;
+    font-size: 14px;
+    color: var(--fg);
+  }
+  dl.cmds dd .hint {
+    color: var(--muted);
+    font-size: 12.5px;
+    display: block;
+    margin-top: 1px;
+  }
+  .new-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--new);
+    border: 1px solid var(--new);
+    padding: 0 4px;
+    border-radius: 3px;
+    margin-left: 6px;
+    vertical-align: 1px;
+  }
+  .beta-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    padding: 0 4px;
+    border-radius: 3px;
+    margin-left: 6px;
+    vertical-align: 1px;
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px 32px;
+  }
+  @media (max-width: 720px) {
+    .grid-2 { grid-template-columns: 1fr; }
+    dl.cmds { grid-template-columns: 1fr; gap: 2px 0; }
+    dl.cmds dt { display: inline-block; }
+  }
+  .flow {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13px;
+    color: var(--muted);
+    background: var(--code-bg);
+    padding: 10px 14px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 0 0 14px;
+  }
+  .flow b { color: var(--accent); font-weight: 600; }
+  footer {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 12px;
+  }
+  kbd {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+  @media print {
+    body { background: white; color: black; padding: 0; font-size: 11pt; }
+    .wrap { max-width: none; }
+    section { break-inside: avoid; }
+    dl.cmds dt { background: none; color: black; padding: 0; }
+    .flow { background: none; border: 1px solid #ccc; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>GSD Cheat Sheet</h1>
+  <div class="meta">
+    <span>v1.40.0</span><span class="sep">·</span>
+    <span>Last updated: May 6, 2026 by Ed St. Louis</span><span class="sep">·</span>
+    <span>Slash commands prefix all names with <code>/</code></span>
+  </div>
+  <p class="lede">
+    GSD is a planning &amp; execution framework for Claude Code. Each project moves through a milestone &rarr; phase &rarr; plan &rarr; execute &rarr; verify loop, with atomic commits and persistent state under <code>.planning/</code>. This sheet groups every command by what you are trying to do.
+  </p>
+</header>
+
+<section>
+  <h2><span class="h-emoji">🧭</span>The core loop</h2>
+  <p class="blurb">When you don't know which command to run, run <code>/gsd-progress</code> &mdash; it dispatches based on current state.</p>
+  <div class="flow">
+    <b>/gsd-new-project</b> &rarr; <b>/gsd-new-milestone</b> &rarr; <b>/gsd-spec-phase</b> &rarr; <b>/gsd-discuss-phase</b> &rarr; <b>/gsd-plan-phase</b> &rarr; <b>/gsd-execute-phase</b> &rarr; <b>/gsd-verify-work</b> &rarr; <b>/gsd-ship</b> &rarr; <b>/gsd-complete-milestone</b>
+  </div>
+  <dl class="cmds">
+    <dt>/gsd-progress</dt><dd>Unified situational command &mdash; check state, advance workflow, or dispatch freeform intent.</dd>
+    <dt>/gsd-help</dt><dd>Show available GSD commands and usage guide.</dd>
+    <dt>/gsd-autonomous</dt><dd>Run all remaining phases autonomously: discuss &rarr; plan &rarr; execute per phase.</dd>
+  </dl>
+</section>
+
+<div class="grid-2">
+
+<section>
+  <h2><span class="h-emoji">🚀</span>Project &amp; Milestone</h2>
+  <p class="blurb">Start, scope, and close out work cycles.</p>
+  <dl class="cmds">
+    <dt>/gsd-new-project</dt><dd>Initialize a new project with deep context gathering and PROJECT.md.</dd>
+    <dt>/gsd-new-milestone</dt><dd>Start a new milestone cycle &mdash; updates PROJECT.md and routes to requirements.</dd>
+    <dt>/gsd-complete-milestone</dt><dd>Archive completed milestone and prepare for next version.</dd>
+    <dt>/gsd-audit-milestone</dt><dd>Audit milestone completion against original intent before archiving.</dd>
+    <dt>/gsd-milestone-summary</dt><dd>Generate a comprehensive project summary for onboarding and review.</dd>
+    <dt>/gsd-stats</dt><dd>Display project statistics &mdash; phases, plans, requirements, git, timeline.</dd>
+  </dl>
+</section>
+
+<section>
+  <h2><span class="h-emoji">🔄</span>Phase Workflow</h2>
+  <p class="blurb">The four core stages of every phase.</p>
+  <dl class="cmds">
+    <dt>/gsd-spec-phase</dt><dd>Clarify <em>what</em> a phase delivers with ambiguity scoring; produces SPEC.md.</dd>
+    <dt>/gsd-discuss-phase</dt><dd>Gather phase context through adaptive questioning before planning.</dd>
+    <dt>/gsd-plan-phase</dt><dd>Create detailed PLAN.md with verification loop.</dd>
+    <dt>/gsd-execute-phase</dt><dd>Execute all plans in a phase with wave-based parallelization.</dd>
+    <dt>/gsd-verify-work</dt><dd>Validate built features through conversational UAT.</dd>
+    <dt>/gsd-ship</dt><dd>Create PR, run review, prepare for merge after verification passes.</dd>
+    <dt>/gsd-phase</dt><dd>CRUD for phases in ROADMAP.md &mdash; add, insert, remove, edit.</dd>
+  </dl>
+</section>
+
+<section>
+  <h2><span class="h-emoji">⚡</span>Quick &amp; Pause/Resume</h2>
+  <p class="blurb">For trivial work and context handoffs.</p>
+  <dl class="cmds">
+    <dt>/gsd-quick</dt><dd>Quick task with GSD guarantees (atomic commits, state) but no optional agents.</dd>
+    <dt>/gsd-fast</dt><dd>Trivial task inline &mdash; no subagents, no planning overhead.</dd>
+    <dt>/gsd-pause-work</dt><dd>Create context handoff when pausing work mid-phase.</dd>
+    <dt>/gsd-resume-work</dt><dd>Resume work from previous session with full context restoration.</dd>
+    <dt>/gsd-undo</dt><dd>Safe git revert &mdash; roll back phase or plan commits using the manifest.</dd>
+  </dl>
+</section>
+
+<section>
+  <h2><span class="h-emoji">🎨</span>UI &amp; AI Phases</h2>
+  <p class="blurb">Specialized contracts for frontend and AI work.</p>
+  <dl class="cmds">
+    <dt>/gsd-ui-phase</dt><dd>Generate UI design contract (UI-SPEC.md) for frontend phases.</dd>
+    <dt>/gsd-ui-review</dt><dd>Retroactive 6-pillar visual audit of implemented frontend code.</dd>
+    <dt>/gsd-sketch</dt><dd>Sketch UI/design ideas with throwaway HTML mockups.</dd>
+    <dt>/gsd-ai-integration-phase</dt><dd>Generate AI-SPEC.md for phases that build AI systems.</dd>
+    <dt>/gsd-eval-review</dt><dd>Audit an executed AI phase&rsquo;s evaluation coverage.</dd>
+    <dt>/gsd-spike</dt><dd>Spike an idea through experiential exploration.</dd>
+  </dl>
+</section>
+
+<section>
+  <h2><span class="h-emoji">🛡️</span>Quality &amp; Review</h2>
+  <p class="blurb">Structured reviews and cross-AI feedback loops.</p>
+  <dl class="cmds">
+    <dt>/gsd-code-review</dt><dd>Review source files changed during a phase for bugs, security, quality.</dd>
+    <dt>/gsd-secure-phase</dt><dd>Retroactively verify threat mitigations for a completed phase.</dd>
+    <dt>/gsd-add-tests</dt><dd>Generate tests for a completed phase based on UAT criteria.</dd>
+    <dt>/gsd-validate-phase</dt><dd>Audit and fill Nyquist validation gaps for a completed phase.</dd>
+    <dt>/gsd-audit-fix</dt><dd>Autonomous audit-to-fix pipeline &mdash; find, classify, fix, test, commit.</dd>
+    <dt>/gsd-audit-uat</dt><dd>Cross-phase audit of all outstanding UAT and verification items.</dd>
+    <dt>/gsd-review</dt><dd>Request cross-AI peer review of phase plans from external CLIs.</dd>
+    <dt>/gsd-plan-review-convergence</dt><dd>Cross-AI plan loop &mdash; replan with feedback until no HIGH concerns.</dd>
+    <dt>/gsd-ultraplan-phase<span class="beta-tag">BETA</span></dt><dd>Offload plan phase to ultraplan cloud; review in browser, import back.</dd>
+  </dl>
+</section>
+
+<section>
+  <h2><span class="h-emoji">🐛</span>Debug &amp; Forensics</h2>
+  <p class="blurb">When things go sideways.</p>
+  <dl class="cmds">
+    <dt>/gsd-debug</dt><dd>Systematic debugging with persistent state across context resets.</dd>
+    <dt>/gsd-forensics</dt><dd>Post-mortem investigation for failed GSD workflows &mdash; what went wrong.</dd>
+    <dt>/gsd-health</dt><dd>Diagnose planning directory health and optionally repair issues.</dd>
+  </dl>
+</section>
+
+<section>
+  <h2><span class="h-emoji">🧠</span>Context &amp; Knowledge</h2>
+  <p class="blurb">Build and reuse codebase intelligence.</p>
+  <dl class="cmds">
+    <dt>/gsd-map-codebase</dt><dd>Analyze codebase with parallel mappers &rarr; .planning/codebase/.</dd>
+    <dt>/gsd-graphify</dt><dd>Build, query, and inspect the project knowledge graph.</dd>
+    <dt>/gsd-docs-update</dt><dd>Generate or update project docs verified against the codebase.</dd>
+    <dt>/gsd-extract-learnings</dt><dd>Extract decisions, lessons, patterns, surprises from completed phases.</dd>
+    <dt>/gsd-thread</dt><dd>Manage persistent context threads for cross-session work.</dd>
+    <dt>/gsd-ingest-docs</dt><dd>Bootstrap or merge a .planning/ setup from existing ADRs/PRDs/SPECs.</dd>
+    <dt>/gsd-import</dt><dd>Ingest external plans with conflict detection vs project decisions.</dd>
+    <dt>/gsd-profile-user</dt><dd>Generate developer behavioral profile and Claude-discoverable artifacts.</dd>
+  </dl>
+</section>
+
+<section>
+  <h2><span class="h-emoji">💡</span>Ideation &amp; Capture</h2>
+  <p class="blurb">Capture before committing to a plan.</p>
+  <dl class="cmds">
+    <dt>/gsd-explore</dt><dd>Socratic ideation and idea routing &mdash; think before planning.</dd>
+    <dt>/gsd-capture</dt><dd>Capture ideas, tasks, notes, and seeds to their destination.</dd>
+    <dt>/gsd-review-backlog</dt><dd>Review and promote backlog items to active milestone.</dd>
+  </dl>
+</section>
+
+<section>
+  <h2><span class="h-emoji">🌊</span>Multi-stream &amp; Workspace</h2>
+  <p class="blurb">Run parallel work without stepping on yourself.</p>
+  <dl class="cmds">
+    <dt>/gsd-manager</dt><dd>Interactive command center for managing multiple phases from one terminal.</dd>
+    <dt>/gsd-workstreams</dt><dd>List, create, switch, status, complete, and resume parallel workstreams.</dd>
+    <dt>/gsd-workspace</dt><dd>Manage GSD workspaces &mdash; create, list, or remove isolated environments.</dd>
+    <dt>/gsd-pr-branch</dt><dd>Create a clean PR branch by filtering out .planning/ commits.</dd>
+    <dt>/gsd-inbox</dt><dd>Triage and review open GitHub issues and PRs against project templates.</dd>
+    <dt>/gsd-cleanup</dt><dd>Archive accumulated phase directories from completed milestones.</dd>
+  </dl>
+</section>
+
+<section>
+  <h2><span class="h-emoji">⚙️</span>System &amp; Config</h2>
+  <p class="blurb">Tune GSD itself.</p>
+  <dl class="cmds">
+    <dt>/gsd-config</dt><dd>Configure GSD settings &mdash; toggles, knobs, integrations, model profile.</dd>
+    <dt>/gsd-settings</dt><dd>Configure GSD workflow toggles and model profile.</dd>
+    <dt>/gsd-update</dt><dd>Update GSD to latest version with changelog display.</dd>
+  </dl>
+  <h3>Update flags</h3>
+  <dl class="cmds">
+    <dt>/gsd-update --sync</dt><dd>Sync managed GSD skills across runtime roots.</dd>
+    <dt>/gsd-update --reapply</dt><dd>Reapply local modifications using three-way comparison after update.</dd>
+  </dl>
+</section>
+
+</div>
+
+<section>
+  <h2><span class="h-emoji">🔖</span>Namespace shortcuts</h2>
+  <p class="blurb">Hubs that group related commands behind a single prompt &mdash; useful when you want a menu instead of memorizing names.</p>
+  <dl class="cmds">
+    <dt>/gsd-ns-workflow</dt><dd>Workflow hub: discuss · plan · execute · verify · phase · progress.</dd>
+    <dt>/gsd-ns-review</dt><dd>Quality gates: code-review · debug · audit · security · eval · ui.</dd>
+    <dt>/gsd-ns-context</dt><dd>Codebase intelligence: map · graphify · docs · learnings.</dd>
+    <dt>/gsd-ns-project</dt><dd>Project lifecycle: milestones · audits · summary.</dd>
+    <dt>/gsd-ns-manage</dt><dd>Config &amp; workspace: workstreams · thread · update · ship · inbox.</dd>
+    <dt>/gsd-ns-ideate</dt><dd>Exploration capture: explore · sketch · spike · spec · capture.</dd>
+  </dl>
+</section>
+
+<section>
+  <h2><span class="h-emoji">🧰</span>Built-in Claude Code skills (non-GSD)</h2>
+  <p class="blurb">Useful companions installed alongside Claude Code.</p>
+  <dl class="cmds">
+    <dt>/init</dt><dd>Initialize a new CLAUDE.md with codebase documentation.</dd>
+    <dt>/review</dt><dd>Review a pull request.</dd>
+    <dt>/security-review</dt><dd>Complete a security review of pending changes on the current branch.</dd>
+    <dt>/simplify</dt><dd>Review changed code for reuse, quality, efficiency &mdash; then fix issues.</dd>
+    <dt>/loop</dt><dd>Run a prompt or slash command on a recurring interval (e.g. <code>/loop 5m /foo</code>).</dd>
+    <dt>/schedule</dt><dd>Create, list, or run scheduled remote agents on a cron schedule.</dd>
+    <dt>/update-config</dt><dd>Configure the Claude Code harness via settings.json (hooks, permissions, env).</dd>
+    <dt>/keybindings-help</dt><dd>Customize keyboard shortcuts in <code>~/.claude/keybindings.json</code>.</dd>
+    <dt>/fewer-permission-prompts</dt><dd>Add a prioritized allowlist to project settings to reduce prompts.</dd>
+    <dt>/claude-api</dt><dd>Build, debug, optimize Claude API / Anthropic SDK apps.</dd>
+    <dt>/frontend-design</dt><dd>Create distinctive, production-grade frontend interfaces.</dd>
+    <dt>/code-review</dt><dd>Code review a pull request (from the code-review plugin).</dd>
+  </dl>
+</section>
+
+<section>
+  <h2><span class="h-emoji">🗂️</span>What lives where</h2>
+  <dl class="cmds">
+    <dt>.planning/</dt><dd>Per-project state: PROJECT.md, ROADMAP.md, STATE.md, phase folders, codebase intel.</dd>
+    <dt>.planning/phases/NN-name/</dt><dd>Phase artifacts: SPEC.md, DISCUSSION-LOG.md, <code>NN-MM-PLAN.md</code>, VERIFICATION-REPORT.md.</dd>
+    <dt>.planning/codebase/</dt><dd>Codebase mapper output: architecture.md, stack.md, conventions.md, concerns.md, integrations.md, structure.md, testing.md.</dd>
+    <dt>.planning/graphs/</dt><dd>Knowledge-graph output (graph.json, graph.html) from <code>/gsd-graphify</code>.</dd>
+    <dt>.planning/todos/pending/</dt><dd>Captured ideas and todos surfaced by <code>/gsd-capture</code> and <code>/gsd-explore</code>.</dd>
+    <dt>~/.claude/skills/gsd-*/</dt><dd>The skill files (SKILL.md) that back each <code>/gsd-*</code> slash command.</dd>
+    <dt>~/.claude/get-shit-done/</dt><dd>Installed GSD runtime: workflows, templates, bin scripts, VERSION.</dd>
+  </dl>
+</section>
+
+<section>
+  <h2><span class="h-emoji">💭</span>When to reach for what</h2>
+  <dl class="cmds">
+    <dt>Brand-new repo</dt><dd><code>/gsd-new-project</code> &rarr; <code>/gsd-new-milestone</code> &rarr; <code>/gsd-progress</code>.</dd>
+    <dt>Existing repo, no .planning</dt><dd><code>/gsd-ingest-docs</code> or <code>/gsd-map-codebase</code> first, then <code>/gsd-new-milestone</code>.</dd>
+    <dt>One-off fix</dt><dd><code>/gsd-fast</code> (trivial) or <code>/gsd-quick</code> (atomic commits but skip optional agents).</dd>
+    <dt>Vague idea</dt><dd><code>/gsd-explore</code> &rarr; <code>/gsd-capture</code> or <code>/gsd-spike</code>.</dd>
+    <dt>Mid-phase, lost</dt><dd><code>/gsd-progress</code> &mdash; tells you where you are and what&rsquo;s next.</dd>
+    <dt>Bug appeared</dt><dd><code>/gsd-debug</code>; if it&rsquo;s a workflow failure, <code>/gsd-forensics</code>.</dd>
+    <dt>Plan looks shaky</dt><dd><code>/gsd-review</code> or <code>/gsd-plan-review-convergence</code> for cross-AI feedback.</dd>
+    <dt>Ready to ship</dt><dd><code>/gsd-verify-work</code> &rarr; <code>/gsd-ship</code> &rarr; <code>/gsd-complete-milestone</code>.</dd>
+  </dl>
+</section>
+
+<footer>
+  Generated locally · GSD v1.40.0 · Format inspired by <a href="https://cc.storyfox.cz/" style="color:var(--accent);">cc.storyfox.cz</a>. Print with <kbd>⌘</kbd>+<kbd>P</kbd>.
+</footer>
+
+</div>
+</body>
+</html>
