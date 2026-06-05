@@ -55,6 +55,19 @@
     font-size: 14px;
     max-width: 70ch;
   }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.92em;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .install-cmd {
+    color: var(--accent);
+    font-weight: 600;
+    background: color-mix(in srgb, var(--accent) 12%, var(--code-bg));
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  }
   section {
     margin: 28px 0 0;
     page-break-inside: avoid;
@@ -173,6 +186,8 @@
     section { break-inside: avoid; }
     dl.cmds dt { background: none; color: black; padding: 0; }
     .flow { background: none; border: 1px solid #ccc; }
+    code { background: none; padding: 0; }
+    .install-cmd { color: black; border: 1px solid #ccc; padding: 1px 5px; }
   }
 </style>
 </head>
@@ -187,7 +202,7 @@
     <span>Slash commands prefix all names with <code>/</code></span>
   </div>
   <p class="lede">
-    GSD is a planning &amp; execution framework for Claude Code. Each project moves through a milestone &rarr; phase &rarr; plan &rarr; execute &rarr; verify loop, with atomic commits and persistent state under <code>.planning/</code>. This sheet groups every command by what you are trying to do. New here? Install the plugin with <code>npx @opengsd/gsd-core@latest</code>.
+    GSD is a planning &amp; execution framework for Claude Code. Each project moves through a milestone &rarr; phase &rarr; plan &rarr; execute &rarr; verify loop, with atomic commits and persistent state under <code>.planning/</code>. This sheet groups every command by what you are trying to do. New here? Install the plugin with <code class="install-cmd">npx @opengsd/gsd-core@latest</code>.
   </p>
 </header>
 
