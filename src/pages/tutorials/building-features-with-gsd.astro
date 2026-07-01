@@ -16,7 +16,7 @@ const base = import.meta.env.BASE_URL;
 			But what happens when the feature is bigger? Say you want to add priorities, due dates, and filtered views to the task tracker. That's three interconnected changes to the data model, three new CLI commands, modifications to existing commands, and new display logic. If you just start prompting, you'll end up backtracking — "wait, I need to change the add command too" — or building something that doesn't quite fit together.
 		</p>
 		<p class="text-text mb-4">
-			This is where <strong class="text-heading">GSD</strong> comes in. GSD (Get Shit Done) is a plugin for Claude Code that adds a structured workflow on top of your normal coding sessions. It breaks work into a repeating cycle:
+			This is where <strong class="text-heading">GSD</strong> comes in. GSD (Get Shit Done) is a planning and execution framework for Claude Code that adds a structured workflow on top of your normal coding sessions. It breaks work into a repeating cycle:
 		</p>
 		<ol class="text-text mb-6 list-decimal list-inside space-y-2 pl-2">
 			<li><strong class="text-heading">Discuss</strong> — establish implementation preferences and resolve gray areas</li>
@@ -34,34 +34,34 @@ const base = import.meta.env.BASE_URL;
 	<section class="mb-16">
 		<h2 class="text-2xl font-semibold text-heading mb-4">Setting Up GSD</h2>
 		<p class="text-text mb-4">
-			GSD installs as a Claude Code plugin. Run the installer and follow the prompts:
+			GSD installs as a set of skills for your AI coding agent. It supports Claude Code, Gemini CLI, Cursor, Codex, and other runtimes — but this tutorial uses Claude Code. Run the installer and follow the prompts:
 		</p>
 
 		<CodeGroup
 			title="Install GSD"
-			python={`# Install the GSD plugin for Claude Code
+			python={`# Install the GSD framework for Claude Code
 npx @opengsd/gsd-core@latest
 
 # The installer will ask you to choose:
-#   Runtime: Claude Code
+#   Runtime: Claude Code (or pi)
 #   Scope: global (recommended) or local (project-only)
 
 # Navigate to your task tracker project from Tutorial 1
 cd task-tracker
 
-# Start Claude Code — GSD commands are now available
+# Start Claude Code — GSD slash commands are now available
 claude`}
-			typescript={`# Install the GSD plugin for Claude Code
+			typescript={`# Install the GSD framework for Claude Code
 npx @opengsd/gsd-core@latest
 
 # The installer will ask you to choose:
-#   Runtime: Claude Code
+#   Runtime: Claude Code (or pi)
 #   Scope: global (recommended) or local (project-only)
 
 # Navigate to your task tracker project from Tutorial 1
 cd task-tracker
 
-# Start Claude Code — GSD commands are now available
+# Start Claude Code — GSD slash commands are now available
 claude`}
 		/>
 
@@ -69,7 +69,7 @@ claude`}
 			Once Claude Code launches, type <code class="text-accent">/gsd-new-project</code> to initialize GSD for your project. It will ask you questions about what you're building, research the codebase, and set up a <code class="text-accent">.planning/</code> directory to store plans, decisions, and progress.
 		</p>
 		<p class="text-text mb-6">
-			GSD stores everything as plain files in your project. No databases, no cloud services, no accounts. The <code class="text-accent">.planning/</code> directory contains your project state, phase plans, and execution history — all version-controllable and human-readable.
+			GSD stores everything locally in your project. In skills mode, the <code class="text-accent">.planning/</code> directory contains your project state, phase plans, and execution history — all version-controllable and human-readable. (GSD also supports an MCP mode with a SQLite-backed <code class="text-accent">.gsd/</code> directory for richer tooling, but the skills mode shown here is the easiest way to get started.)
 		</p>
 
 		<div class="rounded-lg border border-border bg-surface p-6 mb-6">

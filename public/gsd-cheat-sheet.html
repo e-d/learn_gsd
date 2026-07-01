@@ -197,12 +197,12 @@
 <header>
   <h1>GSD Cheat Sheet</h1>
   <div class="meta">
-    <span>v1.4.4 (@opengsd/gsd-core)</span><span class="sep">·</span>
-    <span>Last updated: June 12, 2026 by Ed St. Louis</span><span class="sep">·</span>
+    <span>v1.6.1 (@opengsd/gsd-core)</span><span class="sep">·</span>
+    <span>Last updated: July 1, 2026 by Ed St. Louis</span><span class="sep">·</span>
     <span>Slash commands prefix all names with <code>/</code></span>
   </div>
   <p class="lede">
-    GSD is a planning &amp; execution framework for Claude Code. Each project moves through a milestone &rarr; phase &rarr; plan &rarr; execute &rarr; verify loop, with atomic commits and persistent state under <code>.planning/</code>. This sheet groups every command by what you are trying to do. New here? Install the plugin with <code class="install-cmd">npx @opengsd/gsd-core@latest</code>.
+    GSD is a planning &amp; execution framework for Claude Code. Each project moves through a milestone &rarr; phase &rarr; plan &rarr; execute &rarr; verify loop, with atomic commits and persistent state under <code>.planning/</code> (skills mode) or <code>.gsd/</code> (MCP mode). This sheet groups every command by what you are trying to do. New here? Install with <code class="install-cmd">npx @opengsd/gsd-core@latest</code>.
   </p>
 </header>
 
@@ -244,6 +244,7 @@
     <dt>/gsd-execute-phase</dt><dd>Execute all plans in a phase with wave-based parallelization.</dd>
     <dt>/gsd-verify-work</dt><dd>Validate built features through conversational UAT.</dd>
     <dt>/gsd-ship</dt><dd>Create PR, run review, prepare for merge after verification passes.</dd>
+    <dt>/gsd-mvp-phase<span class="new-tag">NEW</span></dt><dd>Plan a phase as a vertical MVP slice &mdash; user story, SPIDR splitting, then plan-phase.</dd>
     <dt>/gsd-phase</dt><dd>CRUD for phases in ROADMAP.md &mdash; add, insert, remove, edit.</dd>
   </dl>
 </section>
@@ -307,6 +308,8 @@
     <dt>/gsd-graphify</dt><dd>Build, query, and inspect the project knowledge graph.</dd>
     <dt>/gsd-docs-update</dt><dd>Generate or update project docs verified against the codebase.</dd>
     <dt>/gsd-extract-learnings</dt><dd>Extract decisions, lessons, patterns, surprises from completed phases.</dd>
+    <dt>/gsd-mempalace-capture<span class="new-tag">NEW</span></dt><dd>File a phase artifact into MemPalace; mirror decision facts into its temporal KG.</dd>
+    <dt>/gsd-mempalace-recall<span class="new-tag">NEW</span></dt><dd>Recall decisions, patterns, and surprises from MemPalace before planning.</dd>
     <dt>/gsd-thread</dt><dd>Manage persistent context threads for cross-session work.</dd>
     <dt>/gsd-ingest-docs</dt><dd>Bootstrap or merge a .planning/ setup from existing ADRs/PRDs/SPECs.</dd>
     <dt>/gsd-import</dt><dd>Ingest external plans with conflict detection vs project decisions.</dd>
@@ -343,12 +346,20 @@
   <dl class="cmds">
     <dt>/gsd-config</dt><dd>Configure GSD settings &mdash; toggles, knobs, integrations, model profile.</dd>
     <dt>/gsd-settings</dt><dd>Configure GSD workflow toggles and model profile.</dd>
+    <dt>/gsd-surface<span class="new-tag">NEW</span></dt><dd>Toggle which skills are surfaced &mdash; apply a profile, list, disable, or enable a cluster.</dd>
     <dt>/gsd-update</dt><dd>Update GSD to latest version with changelog display.</dd>
   </dl>
   <h3>Update flags</h3>
   <dl class="cmds">
     <dt>/gsd-update --sync</dt><dd>Sync managed GSD skills across runtime roots.</dd>
     <dt>/gsd-update --reapply</dt><dd>Reapply local modifications using three-way comparison after update.</dd>
+  </dl>
+  <h3>Capabilities (v1.6.0+)</h3>
+  <dl class="cmds">
+    <dt>gsd capability install</dt><dd>Install a capability overlay from local, git, npm, or tarball.</dd>
+    <dt>gsd capability list</dt><dd>List installed capabilities and their status.</dd>
+    <dt>gsd capability enable/disable</dt><dd>Toggle a capability on or off without removing it.</dd>
+    <dt>gsd capability remove</dt><dd>Uninstall a capability overlay.</dd>
   </dl>
 </section>
 
@@ -383,13 +394,17 @@
     <dt>/claude-api</dt><dd>Build, debug, optimize Claude API / Anthropic SDK apps.</dd>
     <dt>/frontend-design</dt><dd>Create distinctive, production-grade frontend interfaces.</dd>
     <dt>/code-review</dt><dd>Code review a pull request (from the code-review plugin).</dd>
+    <dt>/deep-research</dt><dd>Fan-out web searches, fetch sources, adversarially verify claims, synthesize a cited report.</dd>
+    <dt>/run</dt><dd>Launch and drive the project app to see a change working in the real product.</dd>
+    <dt>/verify</dt><dd>Verify a code change actually works by exercising it end-to-end before committing.</dd>
   </dl>
 </section>
 
 <section>
   <h2><span class="h-emoji">🗂️</span>What lives where</h2>
   <dl class="cmds">
-    <dt>.planning/</dt><dd>Per-project state: PROJECT.md, ROADMAP.md, STATE.md, phase folders, codebase intel.</dd>
+    <dt>.planning/</dt><dd>Per-project state (skills mode): PROJECT.md, ROADMAP.md, STATE.md, phase folders, codebase intel.</dd>
+    <dt>.gsd/</dt><dd>Per-project state (MCP mode): gsd.db, milestones/, PROJECT.md, REQUIREMENTS.md, STATE.md.</dd>
     <dt>.planning/phases/NN-name/</dt><dd>Phase artifacts: SPEC.md, DISCUSSION-LOG.md, <code>NN-MM-PLAN.md</code>, VERIFICATION-REPORT.md.</dd>
     <dt>.planning/codebase/</dt><dd>Codebase mapper output: architecture.md, stack.md, conventions.md, concerns.md, integrations.md, structure.md, testing.md.</dd>
     <dt>.planning/graphs/</dt><dd>Knowledge-graph output (graph.json, graph.html) from <code>/gsd-graphify</code>.</dd>
@@ -406,6 +421,7 @@
     <dt>Existing repo, no .planning</dt><dd><code>/gsd-ingest-docs</code> or <code>/gsd-map-codebase</code> first, then <code>/gsd-new-milestone</code>.</dd>
     <dt>One-off fix</dt><dd><code>/gsd-fast</code> (trivial) or <code>/gsd-quick</code> (atomic commits but skip optional agents).</dd>
     <dt>Vague idea</dt><dd><code>/gsd-explore</code> &rarr; <code>/gsd-capture</code> or <code>/gsd-spike</code>.</dd>
+    <dt>MVP feature slice</dt><dd><code>/gsd-mvp-phase</code> &mdash; user story &rarr; SPIDR splitting &rarr; plan-phase.</dd>
     <dt>Mid-phase, lost</dt><dd><code>/gsd-progress</code> &mdash; tells you where you are and what&rsquo;s next.</dd>
     <dt>Bug appeared</dt><dd><code>/gsd-debug</code>; if it&rsquo;s a workflow failure, <code>/gsd-forensics</code>.</dd>
     <dt>Plan looks shaky</dt><dd><code>/gsd-review</code> or <code>/gsd-plan-review-convergence</code> for cross-AI feedback.</dd>
@@ -414,7 +430,7 @@
 </section>
 
 <footer>
-  Generated locally · GSD v1.4.4 · Format inspired by <a href="https://cc.storyfox.cz/" style="color:var(--accent);">cc.storyfox.cz</a>. Print with <kbd>⌘</kbd>+<kbd>P</kbd>.
+  Generated locally · GSD v1.6.1 · Format inspired by <a href="https://cc.storyfox.cz/" style="color:var(--accent);">cc.storyfox.cz</a>. Print with <kbd>⌘</kbd>+<kbd>P</kbd>.
 </footer>
 
 </div>
